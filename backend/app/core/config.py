@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -22,9 +23,6 @@ class Settings(BaseSettings):
 
     # OpenAI
     OPENAI_API_KEY: str
-
-    # Cohere
-    COHERE_API_KEY: str
 
     # AWS S3 (Optional - can use local storage)
     AWS_ACCESS_KEY_ID: str = "not_required"
@@ -57,7 +55,7 @@ class Settings(BaseSettings):
     RERANK_TOP_K: int = 5
 
     class Config:
-        env_file = ".env"
+        env_file = [".env", str(Path(__file__).resolve().parents[3] / ".env")]
         case_sensitive = True
 
 
