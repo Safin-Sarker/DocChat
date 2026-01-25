@@ -36,13 +36,11 @@
   - [4. Database Setup](#4-database-setup)
   - [5. Environment Configuration](#5-environment-configuration)
 - [Running the Application](#running-the-application)
-- [Usage Guide](#usage-guide)
-- [API Reference](#api-reference)
 - [Project Structure](#project-structure)
 - [Configuration Options](#configuration-options)
-- [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
+- [Contact Information](#contact-information)
 
 ---
 
@@ -63,18 +61,18 @@ Traditional document search systems rely on keyword matching, often missing the 
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| **Multimodal Document Processing** | Extract and process text, tables, and images from PDFs and documents |
-| **Hybrid RAG Pipeline** | Combines semantic search, BM25, and graph-based retrieval for superior accuracy |
-| **Knowledge Graph Visualization** | Interactive vis-network graph showing entity relationships |
-| **Real-time Chat Interface** | Stream-like chat experience with source citations |
-| **Entity Extraction** | Automatic extraction of people, organizations, concepts from documents |
-| **Hierarchical Chunking** | Parent-child chunking strategy for better context preservation |
-| **OpenAI Reranking** | GPT-powered reranking for optimal result ordering |
-| **Persistent Sessions** | Chat history and document context preserved across sessions |
-| **Docker Support** | One-command infrastructure setup with Docker Compose |
-| **RESTful API** | Well-documented API with Swagger UI |
+| Feature                            | Description                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------- |
+| **Multimodal Document Processing** | Extract and process text, tables, and images from PDFs and documents            |
+| **Hybrid RAG Pipeline**            | Combines semantic search, BM25, and graph-based retrieval for superior accuracy |
+| **Knowledge Graph Visualization**  | Interactive vis-network graph showing entity relationships                      |
+| **Real-time Chat Interface**       | Stream-like chat experience with source citations                               |
+| **Entity Extraction**              | Automatic extraction of people, organizations, concepts from documents          |
+| **Hierarchical Chunking**          | Parent-child chunking strategy for better context preservation                  |
+| **OpenAI Reranking**               | GPT-powered reranking for optimal result ordering                               |
+| **Persistent Sessions**            | Chat history and document context preserved across sessions                     |
+| **Docker Support**                 | One-command infrastructure setup with Docker Compose                            |
+| **RESTful API**                    | Well-documented API with Swagger UI                                             |
 
 ---
 
@@ -82,40 +80,40 @@ Traditional document search systems rely on keyword matching, often missing the 
 
 ### Backend
 
-| Technology | Purpose |
-|------------|---------|
-| **Python 3.11+** | Core programming language |
-| **FastAPI** | High-performance async web framework |
-| **LangChain** | LLM orchestration and chain management |
-| **LlamaIndex** | Document indexing and retrieval |
-| **OpenAI GPT-4** | Language model for generation and embeddings |
-| **Pinecone** | Vector database for semantic search |
-| **Neo4j** | Graph database for entity relationships |
-| **Sentence Transformers** | Local embedding generation |
-| **Pydantic** | Data validation and settings management |
-| **Uvicorn** | ASGI server |
+| Technology                | Purpose                                      |
+| ------------------------- | -------------------------------------------- |
+| **Python 3.11+**          | Core programming language                    |
+| **FastAPI**               | High-performance async web framework         |
+| **LangChain**             | LLM orchestration and chain management       |
+| **LlamaIndex**            | Document indexing and retrieval              |
+| **OpenAI GPT-4**          | Language model for generation and embeddings |
+| **Pinecone**              | Vector database for semantic search          |
+| **Neo4j**                 | Graph database for entity relationships      |
+| **Sentence Transformers** | Local embedding generation                   |
+| **Pydantic**              | Data validation and settings management      |
+| **Uvicorn**               | ASGI server                                  |
 
 ### Frontend
 
-| Technology | Purpose |
-|------------|---------|
-| **React 19** | UI component library |
-| **TypeScript** | Type-safe JavaScript |
-| **Vite** | Next-generation frontend tooling |
-| **TailwindCSS** | Utility-first CSS framework |
-| **shadcn/ui** | Accessible component library |
-| **vis-network** | Interactive graph visualization |
-| **TanStack Query** | Async state management |
-| **Zustand** | Lightweight state management |
-| **Axios** | HTTP client |
+| Technology         | Purpose                          |
+| ------------------ | -------------------------------- |
+| **React 19**       | UI component library             |
+| **TypeScript**     | Type-safe JavaScript             |
+| **Vite**           | Next-generation frontend tooling |
+| **TailwindCSS**    | Utility-first CSS framework      |
+| **shadcn/ui**      | Accessible component library     |
+| **vis-network**    | Interactive graph visualization  |
+| **TanStack Query** | Async state management           |
+| **Zustand**        | Lightweight state management     |
+| **Axios**          | HTTP client                      |
 
 ### Infrastructure
 
-| Technology | Purpose |
-|------------|---------|
-| **Docker** | Containerization |
+| Technology         | Purpose                       |
+| ------------------ | ----------------------------- |
+| **Docker**         | Containerization              |
 | **Docker Compose** | Multi-container orchestration |
-| **Neo4j 5.16** | Graph database container |
+| **Neo4j 5.16**     | Graph database container      |
 
 ---
 
@@ -171,19 +169,19 @@ Traditional document search systems rely on keyword matching, often missing the 
 
 Before you begin, ensure you have the following installed:
 
-| Requirement | Version | Installation |
-|-------------|---------|--------------|
-| **Python** | 3.11+ | [Download](https://www.python.org/downloads/) |
-| **Node.js** | 18+ | [Download](https://nodejs.org/) |
-| **Docker Desktop** | Latest | [Download](https://www.docker.com/products/docker-desktop/) |
-| **Git** | Latest | [Download](https://git-scm.com/) |
+| Requirement        | Version | Installation                                                |
+| ------------------ | ------- | ----------------------------------------------------------- |
+| **Python**         | 3.11+   | [Download](https://www.python.org/downloads/)               |
+| **Node.js**        | 18+     | [Download](https://nodejs.org/)                             |
+| **Docker Desktop** | Latest  | [Download](https://www.docker.com/products/docker-desktop/) |
+| **Git**            | Latest  | [Download](https://git-scm.com/)                            |
 
 ### Required API Keys
 
-| Service | Purpose | Get Key |
-|---------|---------|---------|
-| **OpenAI** | LLM & Embeddings | [OpenAI Platform](https://platform.openai.com/api-keys) |
-| **Pinecone** | Vector Database | [Pinecone Console](https://www.pinecone.io/) |
+| Service      | Purpose          | Get Key                                                 |
+| ------------ | ---------------- | ------------------------------------------------------- |
+| **OpenAI**   | LLM & Embeddings | [OpenAI Platform](https://platform.openai.com/api-keys) |
+| **Pinecone** | Vector Database  | [Pinecone Console](https://www.pinecone.io/)            |
 
 ---
 
@@ -241,6 +239,7 @@ docker ps
 ```
 
 Neo4j will be available at:
+
 - **Browser UI**: http://localhost:7474
 - **Bolt Connection**: bolt://localhost:7687
 - **Credentials**: neo4j / password123
@@ -296,17 +295,20 @@ USE_LOCAL_STORAGE=True
 Open **three terminal windows**:
 
 **Terminal 1 - Start Neo4j:**
+
 ```bash
 docker-compose up
 ```
 
 **Terminal 2 - Start Backend:**
+
 ```bash
 cd backend
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 **Terminal 3 - Start Frontend:**
+
 ```bash
 cd frontend
 npm run dev
@@ -340,38 +342,12 @@ echo Neo4j:    http://localhost:7474
 
 ### Access the Application
 
-| Service | URL |
-|---------|-----|
-| **Frontend Application** | http://localhost:5173 |
-| **Backend API** | http://localhost:8001 |
+| Service                         | URL                            |
+| ------------------------------- | ------------------------------ |
+| **Frontend Application**        | http://localhost:5173          |
+| **Backend API**                 | http://localhost:8001          |
 | **API Documentation (Swagger)** | http://localhost:8001/api/docs |
-| **Neo4j Browser** | http://localhost:7474 |
-
----
-
-## Usage Guide
-
-### Step 1: Upload a Document
-
-1. Open http://localhost:5173 in your browser
-2. Click the upload area or drag & drop a PDF/document
-3. Wait for processing (you'll see progress indicators)
-4. Once complete, the document stats will display (pages, chunks, vectors)
-
-### Step 2: Ask Questions
-
-1. Switch to the **Chat** tab
-2. Type your question in the input field (e.g., "What is this document about?")
-3. Press Enter or click the Send button
-4. View the AI response with source citations
-
-### Step 3: Explore Knowledge Graph
-
-1. After asking at least one question, switch to the **Knowledge Graph** tab
-2. View extracted entities and their relationships as an interactive network
-3. Click on nodes to see entity details
-4. Use zoom controls (+/-) to navigate the graph
-5. Drag nodes to rearrange the visualization
+| **Neo4j Browser**               | http://localhost:7474          |
 
 ---
 
@@ -443,18 +419,18 @@ DocChat/
 
 ### Backend Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DEBUG` | `False` | Enable debug mode |
-| `EMBEDDING_MODEL` | `text-embedding-ada-002` | OpenAI embedding model |
-| `LLM_MODEL` | `gpt-4` | OpenAI chat model |
-| `VISION_MODEL` | `gpt-4-vision-preview` | Model for image analysis |
-| `TEMPERATURE` | `0.7` | LLM response temperature |
-| `PARENT_CHUNK_SIZE` | `1500` | Parent chunk token size |
-| `CHILD_CHUNK_SIZE` | `300` | Child chunk token size |
-| `SEMANTIC_TOP_K` | `10` | Semantic search results count |
-| `RERANK_TOP_K` | `5` | Final reranked results count |
-| `MAX_UPLOAD_SIZE` | `52428800` | Max upload file size (50MB) |
+| Variable            | Default                  | Description                   |
+| ------------------- | ------------------------ | ----------------------------- |
+| `DEBUG`             | `False`                  | Enable debug mode             |
+| `EMBEDDING_MODEL`   | `text-embedding-ada-002` | OpenAI embedding model        |
+| `LLM_MODEL`         | `gpt-4`                  | OpenAI chat model             |
+| `VISION_MODEL`      | `gpt-4-vision-preview`   | Model for image analysis      |
+| `TEMPERATURE`       | `0.7`                    | LLM response temperature      |
+| `PARENT_CHUNK_SIZE` | `1500`                   | Parent chunk token size       |
+| `CHILD_CHUNK_SIZE`  | `300`                    | Child chunk token size        |
+| `SEMANTIC_TOP_K`    | `10`                     | Semantic search results count |
+| `RERANK_TOP_K`      | `5`                      | Final reranked results count  |
+| `MAX_UPLOAD_SIZE`   | `52428800`               | Max upload file size (50MB)   |
 
 ### Frontend Configuration
 
@@ -463,46 +439,6 @@ Create `frontend/.env` (optional):
 ```env
 VITE_API_URL=http://localhost:8001
 VITE_API_TIMEOUT=30000
-```
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| **Neo4j connection refused** | Ensure Docker Desktop is running, then execute `docker-compose up -d` |
-| **CORS errors in browser** | Backend must run on port 8001 (frontend proxies to this port) |
-| **Module not found (Python)** | Activate venv and run `pip install -r requirements.txt` |
-| **Pinecone index error** | Create index in Pinecone console with dimension 1536 |
-| **Knowledge graph empty** | Ask a question in Chat tab first to extract entities |
-| **Chat disabled after refresh** | This is fixed - state persists in localStorage |
-| **Graph keeps bouncing** | Wait for stabilization or the physics will auto-disable |
-
-### Viewing Logs
-
-```bash
-# Backend logs (in backend terminal)
-cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-
-# Neo4j container logs
-docker logs docgraph-neo4j --tail 50
-
-# Frontend build errors
-cd frontend && npm run dev
-```
-
-### Reset Application State
-
-```bash
-# Clear browser localStorage (in browser console)
-localStorage.clear()
-
-# Reset Neo4j data
-docker-compose down -v
-docker-compose up -d
 ```
 
 ---
@@ -542,15 +478,14 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ---
 
-## Acknowledgments
+## Contact Information
 
-- [OpenAI](https://openai.com/) - GPT-4 and text embeddings
-- [Pinecone](https://www.pinecone.io/) - Vector database
-- [Neo4j](https://neo4j.com/) - Graph database
-- [LangChain](https://langchain.com/) - LLM orchestration
-- [LlamaIndex](https://www.llamaindex.ai/) - Document indexing
-- [shadcn/ui](https://ui.shadcn.com/) - UI components
-- [vis-network](https://visjs.github.io/vis-network/docs/network/) - Graph visualization
+|               |                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------- |
+| **Name**      | MD Safin Sarker                                                                     |
+| **Email**     | [safinsarker1122@gmail.com](mailto:safinsarker1122@gmail.com)                       |
+| **LinkedIn**  | [linkedin.com/in/safin-sarker](https://www.linkedin.com/in/safin-sarker/)           |
+| **Portfolio** | [safin-portfolio-website.netlify.app](https://safin-portfolio-website.netlify.app/) |
 
 ---
 
