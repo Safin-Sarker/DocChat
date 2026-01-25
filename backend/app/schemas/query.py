@@ -16,3 +16,4 @@ class QueryResponse(BaseModel):
     answer: str
     contexts: List[str]
     sources: List[Dict[str, Any]]
+    entities: List[str] = []

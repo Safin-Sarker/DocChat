@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     LOCAL_STORAGE_PATH: str = "./uploaded_files"
 
     # API Settings
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: list = ["*"]
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
 
     # RAG Settings

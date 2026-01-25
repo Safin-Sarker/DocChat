@@ -52,18 +52,30 @@ class GraphStore:
         self,
         seed_entities: List[str],
         max_depth: int = 2,
-        limit: int = 10
+        limit: int = 50
     ) -> List[Dict[str, Any]]:
         """Query related entities using graph traversal."""
         if not seed_entities:
             return []
+
+        # Normalize seeds to uppercase for case-insensitive matching
+        normalized_seeds = [s.upper() for s in seed_entities]
+
         query = (
-            "MATCH (seed:Entity) WHERE seed.name IN $seeds "
+            "MATCH (seed:Entity) WHERE toUpper(seed.name) IN $seeds "
             "CALL apoc.path.subgraphAll(seed, {maxLevel: $depth}) YIELD nodes, relationships "
             "UNWIND nodes AS n "
-            "RETURN DISTINCT n.name AS name "
+            "RETURN DISTINCT id(n) AS id, n.name AS name, labels(n)[0] AS type "
             "LIMIT $limit"
         )
         with self.driver.session() as session:
-            result = session.run(query, seeds=seed_entities, depth=max_depth, limit=limit)
-            return [{"name": record["name"]} for record in result]
+            result = session.run(query, seeds=normalized_seeds, depth=max_depth, limit=limit)
+            return [
+                {
+                    "id": str(record["id"]),
+                    "label": record["name"],
+                    "type": record["type"] or "entity",
+                    "properties": {}
+                }
+                for record in result
+            ]
