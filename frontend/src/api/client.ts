@@ -3,6 +3,7 @@ import type {
   QueryRequest,
   QueryResponse,
   DocumentUploadResponse,
+  DeleteDocumentResponse,
   GraphQueryRequest,
   GraphQueryResponse,
   HealthCheckResponse,
@@ -75,6 +76,14 @@ export const api = {
     const response = await apiClient.post<GraphQueryResponse>(
       '/api/v1/graph/related',
       graphRequest
+    );
+    return response.data;
+  },
+
+  // Delete document
+  deleteDocument: async (docId: string): Promise<DeleteDocumentResponse> => {
+    const response = await apiClient.delete<DeleteDocumentResponse>(
+      `/api/v1/documents/${docId}`
     );
     return response.data;
   },

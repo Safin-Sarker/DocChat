@@ -48,6 +48,30 @@ class GraphStore:
         with self.driver.session() as session:
             session.run(query, source=source, target=target, doc_id=doc_id)
 
+    def delete_by_doc_id(self, doc_id: str):
+        """Delete all document references from graph.
+
+        1. Remove doc_id from entity doc_ids arrays
+        2. Delete relationships created by this document
+        3. Delete orphaned entities (empty doc_ids)
+        """
+        with self.driver.session() as session:
+            # Remove doc_id from entities and delete orphaned ones
+            session.run("""
+                MATCH (e:Entity)
+                WHERE $doc_id IN e.doc_ids
+                SET e.doc_ids = [id IN e.doc_ids WHERE id <> $doc_id]
+                WITH e
+                WHERE size(e.doc_ids) = 0
+                DETACH DELETE e
+            """, doc_id=doc_id)
+
+            # Delete relationships from this document
+            session.run("""
+                MATCH ()-[r:RELATED_TO {doc_id: $doc_id}]-()
+                DELETE r
+            """, doc_id=doc_id)
+
     def query_related_entities(
         self,
         seed_entities: List[str],

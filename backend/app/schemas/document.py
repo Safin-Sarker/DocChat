@@ -1,5 +1,6 @@
 """Pydantic schemas for documents."""
 
+from typing import List, Optional, Literal
 from pydantic import BaseModel
 
 
@@ -14,3 +15,11 @@ class DocumentUploadResponse(BaseModel):
     table_chunks: int
     images: int
     upserted_vectors: int
+
+
+class DeleteDocumentResponse(BaseModel):
+    """Response for document deletion."""
+
+    status: Literal["deleted", "partial"]
+    doc_id: str
+    errors: Optional[List[str]] = None

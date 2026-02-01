@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Message } from '../types/api';
+import type { Message, UploadedDocument } from '../types/api';
 
 interface ChatStore {
   messages: Message[];
@@ -8,6 +8,7 @@ interface ChatStore {
   isLoading: boolean;
   entities: string[];
   serverSessionId: string | null;
+  uploadedDocuments: UploadedDocument[];
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
   updateLastMessage: (content: string, sources?: Array<Record<string, any>>, contexts?: string[]) => void;
   clearMessages: () => void;
@@ -15,6 +16,8 @@ interface ChatStore {
   setLoading: (loading: boolean) => void;
   setEntities: (entities: string[]) => void;
   setServerSessionId: (id: string | null) => void;
+  addUploadedDocument: (doc: UploadedDocument) => void;
+  removeUploadedDocument: (docId: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -25,6 +28,7 @@ export const useChatStore = create<ChatStore>()(
       isLoading: false,
       entities: [],
       serverSessionId: null,
+      uploadedDocuments: [],
 
       addMessage: (message) =>
         set((state) => ({
@@ -53,7 +57,7 @@ export const useChatStore = create<ChatStore>()(
           return { messages: newMessages };
         }),
 
-      clearMessages: () => set({ messages: [], entities: [] }),
+      clearMessages: () => set({ messages: [], entities: [], uploadedDocuments: [] }),
 
       setCurrentDoc: (docId) => set({ currentDocId: docId }),
 
@@ -62,6 +66,17 @@ export const useChatStore = create<ChatStore>()(
       setEntities: (entities) => set({ entities }),
 
       setServerSessionId: (id) => set({ serverSessionId: id }),
+
+      addUploadedDocument: (doc) =>
+        set((state) => ({
+          uploadedDocuments: [...state.uploadedDocuments, doc],
+        })),
+
+      removeUploadedDocument: (docId) =>
+        set((state) => ({
+          uploadedDocuments: state.uploadedDocuments.filter((d) => d.doc_id !== docId),
+          currentDocId: state.currentDocId === docId ? null : state.currentDocId,
+        })),
     }),
     {
       name: 'docchat-storage',
@@ -70,6 +85,7 @@ export const useChatStore = create<ChatStore>()(
         entities: state.entities,
         messages: state.messages,
         serverSessionId: state.serverSessionId,
+        uploadedDocuments: state.uploadedDocuments,
       }),
     }
   )

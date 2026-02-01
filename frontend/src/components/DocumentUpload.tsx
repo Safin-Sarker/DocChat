@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 export const DocumentUpload = () => {
   const { mutate: uploadDocument, isPending, isSuccess, isError, data, uploadProgress } = useDocumentUpload();
   const setCurrentDoc = useChatStore((state) => state.setCurrentDoc);
+  const addUploadedDocument = useChatStore((state) => state.addUploadedDocument);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -18,11 +19,17 @@ export const DocumentUpload = () => {
         uploadDocument(file, {
           onSuccess: (response) => {
             setCurrentDoc(response.doc_id);
+            addUploadedDocument({
+              doc_id: response.doc_id,
+              filename: file.name,
+              pages: response.pages,
+              uploadedAt: new Date().toISOString(),
+            });
           },
         });
       }
     },
-    [uploadDocument, setCurrentDoc]
+    [uploadDocument, setCurrentDoc, addUploadedDocument]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

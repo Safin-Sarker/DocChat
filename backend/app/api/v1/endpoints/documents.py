@@ -4,8 +4,11 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 import uuid
 import aiofiles
-from app.schemas.document import DocumentUploadResponse
+from app.schemas.document import DocumentUploadResponse, DeleteDocumentResponse
 from app.services.multimodal_processor import MultimodalProcessor
+from app.services.storage_service import StorageService
+from app.models.pinecone_store import PineconeStore
+from app.models.graph_store import GraphStore
 
 
 router = APIRouter()
@@ -40,3 +43,36 @@ async def upload_document(file: UploadFile = File(...)):
                 temp_path.unlink()
         except Exception:
             pass
+
+
+@router.delete("/{doc_id}", response_model=DeleteDocumentResponse)
+async def delete_document(doc_id: str):
+    """Delete a document and all associated data."""
+    errors = []
+
+    # 1. Delete from Pinecone
+    try:
+        pinecone_store = PineconeStore()
+        await pinecone_store.delete_by_doc_id(doc_id)
+    except Exception as e:
+        errors.append(f"Pinecone: {str(e)}")
+
+    # 2. Delete from Neo4j Graph
+    try:
+        graph_store = GraphStore()
+        graph_store.delete_by_doc_id(doc_id)
+        graph_store.close()
+    except Exception as e:
+        errors.append(f"Graph: {str(e)}")
+
+    # 3. Delete from Storage
+    try:
+        storage = StorageService()
+        await storage.delete_document_files(doc_id)
+    except Exception as e:
+        errors.append(f"Storage: {str(e)}")
+
+    if errors:
+        return DeleteDocumentResponse(status="partial", doc_id=doc_id, errors=errors)
+
+    return DeleteDocumentResponse(status="deleted", doc_id=doc_id)

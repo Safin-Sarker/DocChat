@@ -22,6 +22,21 @@ export interface DocumentUploadResponse {
   upserted_vectors: number;
 }
 
+// Uploaded Document (for tracking in sidebar)
+export interface UploadedDocument {
+  doc_id: string;
+  filename: string;
+  pages: number;
+  uploadedAt: string;
+}
+
+// Delete Document Response
+export interface DeleteDocumentResponse {
+  status: 'deleted' | 'partial';
+  doc_id: string;
+  errors?: string[];
+}
+
 // Graph Types
 export interface GraphQueryRequest {
   entities: string[];
