@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, Network, FileUp } from 'lucide-react';
@@ -5,6 +6,7 @@ import { DocumentUpload } from '@/components/DocumentUpload';
 import { ChatInterface } from '@/components/ChatInterface';
 import { GraphVisualization } from '@/components/GraphVisualization';
 import { useChatStore } from '@/stores/chatStore';
+import { api } from '@/api/client';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,7 +18,22 @@ const queryClient = new QueryClient({
 });
 
 function AppContent() {
-  const { entities } = useChatStore();
+  const { entities, serverSessionId, setServerSessionId, clearMessages } = useChatStore();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const health = await api.healthCheck();
+        if (health.session_id && health.session_id !== serverSessionId) {
+          clearMessages();
+          setServerSessionId(health.session_id);
+        }
+      } catch (error) {
+        console.error('Failed to check server session:', error);
+      }
+    };
+    checkSession();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20">

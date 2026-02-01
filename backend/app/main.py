@@ -1,7 +1,11 @@
+import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
+
+# Generate unique session ID when server starts
+SERVER_SESSION_ID = str(time.time())
 
 # Create FastAPI application
 app = FastAPI(
@@ -29,7 +33,8 @@ async def health_check():
     return {
         "status": "healthy",
         "app": settings.APP_NAME,
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
+        "session_id": SERVER_SESSION_ID
     }
 
 

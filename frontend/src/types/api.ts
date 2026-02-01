@@ -44,6 +44,7 @@ export interface GraphQueryResponse {
 export interface HealthCheckResponse {
   status: string;
   message?: string;
+  session_id?: string;
 }
 
 // Message Types (for chat interface)
