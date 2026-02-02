@@ -1,6 +1,6 @@
 """End-to-end RAG pipeline service."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.core.config import settings
 from app.services.hybrid_retrieval import HybridRetrieval
 from app.services.reranker import Reranker
@@ -26,9 +26,14 @@ class AdvancedRAGService:
         self.generator = generator or ResponseGenerator()
         self.entity_extractor = entity_extractor or EntityExtractor()
 
-    async def answer(self, query: str) -> Dict[str, Any]:
-        """Generate an answer with sources and entities."""
-        candidates = await self.retrieval.retrieve(query)
+    async def answer(self, query: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Generate an answer with sources and entities.
+
+        Args:
+            query: User's question
+            user_id: User ID for multi-tenant isolation
+        """
+        candidates = await self.retrieval.retrieve(query, user_id=user_id)
         reranked = await self.reranker.rerank(query, candidates, settings.RERANK_TOP_K)
         contexts = self.assembler.assemble(reranked)
         answer = self.generator.generate(query, contexts)

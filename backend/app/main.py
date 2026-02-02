@@ -1,11 +1,24 @@
 import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
+from app.models.database import init_db
 
 # Generate unique session ID when server starts
 SERVER_SESSION_ID = str(time.time())
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler."""
+    # Startup
+    init_db()
+    print("Database initialized")
+    yield
+    # Shutdown
+    pass
 
 # Create FastAPI application
 app = FastAPI(
@@ -14,7 +27,8 @@ app = FastAPI(
     description="Advanced Multimodal Graph RAG System with React Frontend",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan
 )
 
 # Configure CORS

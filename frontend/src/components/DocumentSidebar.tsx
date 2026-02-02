@@ -1,20 +1,43 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, FileText, Trash2, FolderOpen, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, FileText, Trash2, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChatStore } from '@/stores/chatStore';
+import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/api/client';
 import { cn } from '@/lib/utils';
 
 export function DocumentSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { isAuthenticated } = useAuthStore();
   const {
     uploadedDocuments,
     currentDocId,
     setCurrentDoc,
-    removeUploadedDocument
+    removeUploadedDocument,
+    setUploadedDocuments
   } = useChatStore();
+
+  // Fetch documents from backend on mount and when authenticated
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      if (!isAuthenticated) return;
+
+      setIsLoading(true);
+      try {
+        const docs = await api.getDocuments();
+        setUploadedDocuments(docs);
+      } catch (error) {
+        console.error('Failed to fetch documents:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDocuments();
+  }, [isAuthenticated, setUploadedDocuments]);
 
   const handleDelete = async (docId: string) => {
     setDeletingDocId(docId);

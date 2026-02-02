@@ -1,12 +1,15 @@
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, Network, FileUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MessageSquare, Network, FileUp, LogOut, User } from 'lucide-react';
 import { DocumentUpload } from '@/components/DocumentUpload';
 import { ChatInterface } from '@/components/ChatInterface';
 import { GraphVisualization } from '@/components/GraphVisualization';
 import { DocumentSidebar } from '@/components/DocumentSidebar';
+import { LoginForm } from '@/components/LoginForm';
 import { useChatStore } from '@/stores/chatStore';
+import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/api/client';
 
 const queryClient = new QueryClient({
@@ -20,6 +23,7 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const { entities, serverSessionId, setServerSessionId, clearMessages } = useChatStore();
+  const { user, logout } = useAuthStore();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -35,6 +39,11 @@ function AppContent() {
     };
     checkSession();
   }, []);
+
+  const handleLogout = () => {
+    logout();
+    clearMessages();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20 flex">
@@ -60,11 +69,19 @@ function AppContent() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent/50 border">
                   <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                   <span className="text-xs font-medium text-muted-foreground">Connected</span>
                 </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent/50 border">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{user?.username}</span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
               </div>
             </div>
           </div>
@@ -124,6 +141,12 @@ function AppContent() {
 }
 
 function App() {
+  const { isAuthenticated } = useAuthStore();
+
+  if (!isAuthenticated) {
+    return <LoginForm />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AppContent />

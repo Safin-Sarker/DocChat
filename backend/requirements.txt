@@ -37,3 +37,7 @@ python-dotenv==1.0.1
 httpx==0.26.0
 python-multipart==0.0.6
 aiofiles==23.2.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+bcrypt==4.1.2

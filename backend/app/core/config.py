@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
 
+    # Authentication
+    SECRET_KEY: str = "change-this-secret-key-in-production-use-strong-random-string"
+
     # Pinecone
     PINECONE_API_KEY: str
     PINECONE_ENVIRONMENT: str = "gcp-starter"

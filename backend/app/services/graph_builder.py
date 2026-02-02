@@ -1,6 +1,6 @@
 """Build Neo4j graph from document content."""
 
-from typing import List
+from typing import List, Optional
 from app.models.graph_store import GraphStore
 from app.services.entity_extractor import EntityExtractor
 
@@ -17,16 +17,16 @@ class GraphBuilder:
         self.entity_extractor = entity_extractor or EntityExtractor()
         self.graph_store.ensure_constraints()
 
-    def build_from_texts(self, texts: List[str], doc_id: str):
+    def build_from_texts(self, texts: List[str], doc_id: str, user_id: Optional[str] = None):
         """Extract entities and build co-occurrence relationships."""
         for text in texts:
             entities = self.entity_extractor.extract_entities(text)
             if not entities:
                 continue
-            self.graph_store.upsert_entities(entities, doc_id)
+            self.graph_store.upsert_entities(entities, doc_id, user_id=user_id)
             for i, source in enumerate(entities):
                 for target in entities[i + 1:]:
-                    self.graph_store.create_relationship(source, target, "RELATED_TO", doc_id)
+                    self.graph_store.create_relationship(source, target, "RELATED_TO", doc_id, user_id=user_id)
 
     def close(self):
         """Close underlying resources."""

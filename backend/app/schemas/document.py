@@ -23,3 +23,12 @@ class DeleteDocumentResponse(BaseModel):
     status: Literal["deleted", "partial"]
     doc_id: str
     errors: Optional[List[str]] = None
+
+
+class DocumentInfo(BaseModel):
+    """Document information for listing."""
+
+    doc_id: str
+    filename: str
+    pages: int
+    uploadedAt: str

@@ -40,7 +40,8 @@ class StorageService:
         self,
         file_path: str,
         filename: str,
-        doc_id: Optional[str] = None
+        doc_id: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> str:
         """Upload file to storage.
 
@@ -48,6 +49,7 @@ class StorageService:
             file_path: Path to file to upload
             filename: Original filename
             doc_id: Document ID (optional, will generate if not provided)
+            user_id: User ID for multi-tenant isolation
 
         Returns:
             Storage key/path for the uploaded file
@@ -55,9 +57,11 @@ class StorageService:
         if not doc_id:
             doc_id = str(uuid.uuid4())
 
-        # Create unique storage key
-        file_extension = Path(filename).suffix
-        storage_key = f"{doc_id}/{filename}"
+        # Create unique storage key with user isolation
+        if user_id:
+            storage_key = f"{user_id}/{doc_id}/{filename}"
+        else:
+            storage_key = f"{doc_id}/{filename}"
 
         if self.use_local:
             return await self._upload_local(file_path, storage_key)
@@ -123,7 +127,8 @@ class StorageService:
         image_data: bytes,
         doc_id: str,
         image_id: str,
-        extension: str = "png"
+        extension: str = "png",
+        user_id: Optional[str] = None
     ) -> str:
         """Upload image data to storage.
 
@@ -132,11 +137,15 @@ class StorageService:
             doc_id: Document ID
             image_id: Image ID
             extension: File extension
+            user_id: User ID for multi-tenant isolation
 
         Returns:
             Storage URL/path
         """
-        storage_key = f"{doc_id}/images/{image_id}.{extension}"
+        if user_id:
+            storage_key = f"{user_id}/{doc_id}/images/{image_id}.{extension}"
+        else:
+            storage_key = f"{doc_id}/images/{image_id}.{extension}"
 
         if self.use_local:
             return await self._upload_image_local(image_data, storage_key)
@@ -193,43 +202,56 @@ class StorageService:
             print(f"Error uploading image to S3: {e}")
             raise
 
-    async def delete_document_files(self, doc_id: str):
+    async def delete_document_files(self, doc_id: str, user_id: Optional[str] = None):
         """Delete all files for a document.
 
         Args:
             doc_id: Document ID
+            user_id: User ID for multi-tenant isolation
         """
         if self.use_local:
-            await self._delete_local(doc_id)
+            await self._delete_local(doc_id, user_id)
         else:
-            await self._delete_s3(doc_id)
+            await self._delete_s3(doc_id, user_id)
 
-    async def _delete_local(self, doc_id: str):
+    async def _delete_local(self, doc_id: str, user_id: Optional[str] = None):
         """Delete local files for document.
 
         Args:
             doc_id: Document ID
+            user_id: User ID for multi-tenant isolation
         """
         try:
-            doc_dir = self.storage_path / doc_id
+            if user_id:
+                doc_dir = self.storage_path / user_id / doc_id
+            else:
+                doc_dir = self.storage_path / doc_id
+
             if doc_dir.exists():
                 shutil.rmtree(doc_dir)
-                print(f"Deleted local files for document: {doc_id}")
+                print(f"Deleted local files for document: {doc_id}" + (f" (user: {user_id})" if user_id else ""))
         except Exception as e:
             print(f"Error deleting local files: {e}")
             raise
 
-    async def _delete_s3(self, doc_id: str):
+    async def _delete_s3(self, doc_id: str, user_id: Optional[str] = None):
         """Delete S3 files for document.
 
         Args:
             doc_id: Document ID
+            user_id: User ID for multi-tenant isolation
         """
         try:
+            # Build prefix with user isolation
+            if user_id:
+                prefix = f"{user_id}/{doc_id}/"
+            else:
+                prefix = f"{doc_id}/"
+
             # List and delete all objects with prefix
             response = self.s3_client.list_objects_v2(
                 Bucket=self.bucket_name,
-                Prefix=f"{doc_id}/"
+                Prefix=prefix
             )
 
             if 'Contents' in response:
@@ -238,7 +260,7 @@ class StorageService:
                     Bucket=self.bucket_name,
                     Delete={'Objects': objects}
                 )
-                print(f"Deleted S3 files for document: {doc_id}")
+                print(f"Deleted S3 files for document: {doc_id}" + (f" (user: {user_id})" if user_id else ""))
 
         except Exception as e:
             print(f"Error deleting S3 files: {e}")

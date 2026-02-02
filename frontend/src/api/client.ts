@@ -8,7 +8,12 @@ import type {
   GraphQueryResponse,
   HealthCheckResponse,
   ApiError,
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+  UploadedDocument,
 } from '../types/api';
+import { useAuthStore } from '../stores/authStore';
 
 // Create axios instance with default config
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -22,12 +27,30 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+// Request interceptor to add auth token
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = useAuthStore.getState().token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     const message = error.response?.data?.detail || error.message || 'An error occurred';
     console.error('API Error:', message);
+
+    // Handle 401 errors - logout user
+    if (error.response?.status === 401) {
+      useAuthStore.getState().logout();
+    }
+
     return Promise.reject({
       detail: message,
       status: error.response?.status,
@@ -37,6 +60,17 @@ apiClient.interceptors.response.use(
 
 // API functions
 export const api = {
+  // Auth
+  login: async (credentials: LoginRequest): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/api/v1/auth/login', credentials);
+    return response.data;
+  },
+
+  register: async (data: RegisterRequest): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/api/v1/auth/register', data);
+    return response.data;
+  },
+
   // Health check
   healthCheck: async (): Promise<HealthCheckResponse> => {
     const response = await apiClient.get<HealthCheckResponse>('/health');
@@ -77,6 +111,12 @@ export const api = {
       '/api/v1/graph/related',
       graphRequest
     );
+    return response.data;
+  },
+
+  // Get user's documents
+  getDocuments: async (): Promise<UploadedDocument[]> => {
+    const response = await apiClient.get<UploadedDocument[]>('/api/v1/documents/');
     return response.data;
   },
 

@@ -1,6 +1,6 @@
 """Parent-child chunking service for advanced RAG."""
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import uuid
 from dataclasses import dataclass
 from app.core.config import settings
@@ -167,7 +167,8 @@ class ChunkingService:
         self,
         parent_chunks: List[Chunk],
         child_chunks: List[Chunk],
-        doc_id: str
+        doc_id: str,
+        user_id: Optional[str] = None
     ) -> Dict[str, List[Dict]]:
         """Prepare chunk data for Pinecone storage.
 
@@ -175,6 +176,7 @@ class ChunkingService:
             parent_chunks: List of parent chunks
             child_chunks: List of child chunks
             doc_id: Document ID
+            user_id: User ID for multi-tenant isolation
 
         Returns:
             Dictionary with parent_map and child_data for Pinecone

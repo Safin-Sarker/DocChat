@@ -15,12 +15,13 @@ class ImageExtractor:
         """Initialize with an optional storage service."""
         self.storage_service = storage_service or StorageService()
 
-    async def extract_page_images(self, pdf_path: str, doc_id: str) -> List[Dict[str, Any]]:
+    async def extract_page_images(self, pdf_path: str, doc_id: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Render PDF pages to images and upload them.
 
         Args:
             pdf_path: Path to PDF file
             doc_id: Document ID
+            user_id: User ID for multi-tenant isolation
 
         Returns:
             List of image metadata dictionaries
@@ -36,7 +37,8 @@ class ImageExtractor:
                     image_data=buffer.getvalue(),
                     doc_id=doc_id,
                     image_id=image_id,
-                    extension="png"
+                    extension="png",
+                    user_id=user_id
                 )
                 images_out.append({
                     "page": page_index + 1,

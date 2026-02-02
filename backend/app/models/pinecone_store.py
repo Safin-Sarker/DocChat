@@ -130,7 +130,8 @@ class PineconeStore:
         self,
         query_text: str,
         top_k: int = 10,
-        filter: Optional[Dict[str, Any]] = None
+        filter: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Query Pinecone using text (automatically generates embedding).
 
@@ -138,22 +139,33 @@ class PineconeStore:
             query_text: Query text
             top_k: Number of results to return
             filter: Metadata filter
+            user_id: User ID for filtering (required for multi-tenant isolation)
 
         Returns:
             List of matching results
         """
-        query_vector = await self.get_embedding(query_text)
-        return await self.query(query_vector, top_k, filter)
+        # Build filter with user_id for multi-tenant isolation
+        query_filter = filter.copy() if filter else {}
+        if user_id:
+            query_filter["user_id"] = user_id
 
-    async def delete_by_doc_id(self, doc_id: str):
+        query_vector = await self.get_embedding(query_text)
+        return await self.query(query_vector, top_k, query_filter if query_filter else None)
+
+    async def delete_by_doc_id(self, doc_id: str, user_id: Optional[str] = None):
         """Delete all vectors for a document.
 
         Args:
             doc_id: Document ID to delete
+            user_id: User ID for multi-tenant isolation
         """
         try:
-            self.index.delete(filter={"doc_id": doc_id})
-            print(f"Deleted vectors for document: {doc_id}")
+            filter_dict = {"doc_id": doc_id}
+            if user_id:
+                filter_dict["user_id"] = user_id
+
+            self.index.delete(filter=filter_dict)
+            print(f"Deleted vectors for document: {doc_id}" + (f" (user: {user_id})" if user_id else ""))
         except Exception as e:
             print(f"Error deleting vectors: {e}")
             raise

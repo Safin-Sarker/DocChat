@@ -18,6 +18,7 @@ interface ChatStore {
   setServerSessionId: (id: string | null) => void;
   addUploadedDocument: (doc: UploadedDocument) => void;
   removeUploadedDocument: (docId: string) => void;
+  setUploadedDocuments: (docs: UploadedDocument[]) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -77,6 +78,8 @@ export const useChatStore = create<ChatStore>()(
           uploadedDocuments: state.uploadedDocuments.filter((d) => d.doc_id !== docId),
           currentDocId: state.currentDocId === docId ? null : state.currentDocId,
         })),
+
+      setUploadedDocuments: (docs) => set({ uploadedDocuments: docs }),
     }),
     {
       name: 'docchat-storage',

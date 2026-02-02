@@ -37,7 +37,8 @@ class MultimodalProcessor:
         self,
         file_path: str,
         filename: str,
-        doc_id: Optional[str] = None
+        doc_id: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Process a PDF document and index extracted content.
 
@@ -45,6 +46,7 @@ class MultimodalProcessor:
             file_path: Path to the file to process
             filename: Original filename
             doc_id: Optional document ID
+            user_id: User ID for multi-tenant isolation
 
         Returns:
             Summary of processing results
@@ -53,7 +55,8 @@ class MultimodalProcessor:
         storage_path = await self.storage_service.upload_file(
             file_path=file_path,
             filename=filename,
-            doc_id=document_id
+            doc_id=document_id,
+            user_id=user_id
         )
 
         pages = self._extract_text_pages(file_path)
@@ -62,7 +65,8 @@ class MultimodalProcessor:
             try:
                 self.graph_builder.build_from_texts(
                     [chunk.text for chunk in parent_chunks],
-                    document_id
+                    document_id,
+                    user_id=user_id
                 )
             except Exception as exc:
                 print(f"Graph build failed: {exc}")
@@ -72,13 +76,14 @@ class MultimodalProcessor:
         pinecone_payload = self.chunking_service.prepare_for_pinecone(
             parent_chunks=parent_chunks,
             child_chunks=child_chunks,
-            doc_id=document_id
+            doc_id=document_id,
+            user_id=user_id
         )
 
-        upserted = await self._index_text_chunks(pinecone_payload["child_data"])
+        upserted = await self._index_text_chunks(pinecone_payload["child_data"], user_id=user_id)
         table_entries = self.table_extractor.extract_tables(file_path)
-        table_upserted = await self._index_tables(table_entries, document_id)
-        images = await self.image_extractor.extract_page_images(file_path, document_id)
+        table_upserted = await self._index_tables(table_entries, document_id, user_id=user_id)
+        images = await self.image_extractor.extract_page_images(file_path, document_id, user_id=user_id)
 
         return {
             "doc_id": document_id,
@@ -119,44 +124,50 @@ class MultimodalProcessor:
             print(f"OCR page render failed: {exc}")
             return ""
 
-    async def _index_text_chunks(self, child_data: List[Dict[str, Any]]) -> int:
+    async def _index_text_chunks(self, child_data: List[Dict[str, Any]], user_id: Optional[str] = None) -> int:
         """Index child chunks in Pinecone."""
         vectors = []
         for item in child_data:
             child = item["child"]
             embedding = await self.pinecone_store.get_embedding(child.text)
+            metadata = {
+                "doc_id": item["doc_id"],
+                "parent_id": item["parent_id"],
+                "page": child.page,
+                "type": "text",
+                "text": child.text,
+                "parent_text": item["parent_text"],
+            }
+            if user_id:
+                metadata["user_id"] = user_id
             vectors.append({
                 "id": child.id,
                 "values": embedding,
-                "metadata": {
-                    "doc_id": item["doc_id"],
-                    "parent_id": item["parent_id"],
-                    "page": child.page,
-                    "type": "text",
-                    "text": child.text,
-                    "parent_text": item["parent_text"],
-                }
+                "metadata": metadata
             })
 
         result = await self.pinecone_store.upsert_vectors(vectors)
         return result.get("upserted", 0)
 
-    async def _index_tables(self, tables: List[Dict[str, Any]], doc_id: str) -> int:
+    async def _index_tables(self, tables: List[Dict[str, Any]], doc_id: str, user_id: Optional[str] = None) -> int:
         """Index extracted tables as text chunks."""
         vectors = []
         for table in tables:
             table_id = str(uuid.uuid4())
             embedding = await self.pinecone_store.get_embedding(table["markdown"])
+            metadata = {
+                "doc_id": doc_id,
+                "page": table["page"],
+                "type": "table",
+                "text": table["markdown"],
+                "table_index": table["table_index"],
+            }
+            if user_id:
+                metadata["user_id"] = user_id
             vectors.append({
                 "id": table_id,
                 "values": embedding,
-                "metadata": {
-                    "doc_id": doc_id,
-                    "page": table["page"],
-                    "type": "table",
-                    "text": table["markdown"],
-                    "table_index": table["table_index"],
-                }
+                "metadata": metadata
             })
 
         if not vectors:
