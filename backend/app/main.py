@@ -1,3 +1,22 @@
+import os
+import sys
+
+# Configure Tesseract path for Windows BEFORE any other imports
+if sys.platform == 'win32':
+    tesseract_path = r'C:\Program Files\Tesseract-OCR'
+    tesseract_exe = os.path.join(tesseract_path, 'tesseract.exe')
+    if os.path.exists(tesseract_exe):
+        # Add to PATH
+        os.environ['PATH'] = tesseract_path + os.pathsep + os.environ.get('PATH', '')
+        # Set for pytesseract
+        os.environ['TESSERACT_CMD'] = tesseract_exe
+        # Configure pytesseract directly
+        try:
+            import pytesseract
+            pytesseract.pytesseract.tesseract_cmd = tesseract_exe
+        except ImportError:
+            pass
+
 import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -45,7 +64,7 @@ app.add_middleware(
 async def health_check():
     """Health check endpoint."""
     return {
-        "status": "healthy",
+        "status": "ok",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "session_id": SERVER_SESSION_ID

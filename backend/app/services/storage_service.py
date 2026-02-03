@@ -1,11 +1,18 @@
 """Storage service for handling file uploads (S3 or local)."""
 
 import os
+import stat
 import shutil
 from pathlib import Path
 from typing import Optional
 import uuid
 from app.core.config import settings
+
+
+def _remove_readonly(func, path, _):
+    """Handle read-only files on Windows during shutil.rmtree."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 
 class StorageService:
@@ -228,7 +235,7 @@ class StorageService:
                 doc_dir = self.storage_path / doc_id
 
             if doc_dir.exists():
-                shutil.rmtree(doc_dir)
+                shutil.rmtree(doc_dir, onerror=_remove_readonly)
                 print(f"Deleted local files for document: {doc_id}" + (f" (user: {user_id})" if user_id else ""))
         except Exception as e:
             print(f"Error deleting local files: {e}")

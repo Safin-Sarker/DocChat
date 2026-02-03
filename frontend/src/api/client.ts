@@ -90,7 +90,7 @@ export const api = {
           'Content-Type': 'multipart/form-data',
         },
         onUploadProgress,
-        timeout: 300000, // 5 minutes for document processing
+        timeout: 600000, // 10 minutes for large document processing
       }
     );
     return response.data;

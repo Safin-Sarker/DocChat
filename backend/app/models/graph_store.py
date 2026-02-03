@@ -157,7 +157,7 @@ class GraphStore:
                     "WHERE related.user_id = $user_id "
                     "WITH COLLECT(DISTINCT seed) + COLLECT(DISTINCT related) AS allNodes "
                     "UNWIND allNodes AS n "
-                    "WHERE n IS NOT NULL "
+                    "WITH n WHERE n IS NOT NULL "
                     "RETURN DISTINCT id(n) AS id, n.name AS name, labels(n)[0] AS type "
                     "LIMIT $limit"
                 )
@@ -178,7 +178,7 @@ class GraphStore:
                     "OPTIONAL MATCH (seed)-[*1.." + str(max_depth) + "]-(related:Entity) "
                     "WITH COLLECT(DISTINCT seed) + COLLECT(DISTINCT related) AS allNodes "
                     "UNWIND allNodes AS n "
-                    "WHERE n IS NOT NULL "
+                    "WITH n WHERE n IS NOT NULL "
                     "RETURN DISTINCT id(n) AS id, n.name AS name, labels(n)[0] AS type "
                     "LIMIT $limit"
                 )

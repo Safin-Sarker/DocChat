@@ -1,8 +1,12 @@
 """Multimodal document processing orchestrator."""
 
+import logging
 from typing import Dict, Any, List, Optional
+import asyncio
 import uuid
 import pdfplumber
+
+logger = logging.getLogger(__name__)
 from app.services.chunking_service import ChunkingService
 from app.services.ocr_service import OCRService
 from app.services.image_extractor import ImageExtractor
@@ -52,6 +56,7 @@ class MultimodalProcessor:
             Summary of processing results
         """
         document_id = doc_id or str(uuid.uuid4())
+        logger.info(f"[{document_id}] Uploading file to storage...")
         storage_path = await self.storage_service.upload_file(
             file_path=file_path,
             filename=filename,
@@ -59,17 +64,28 @@ class MultimodalProcessor:
             user_id=user_id
         )
 
-        pages = self._extract_text_pages(file_path)
-        parent_chunks, child_chunks = self.chunking_service.process_document_pages(pages)
+        # Run blocking PDF operations in a thread to avoid blocking the event loop
+        logger.info(f"[{document_id}] Extracting text from pages...")
+        pages = await asyncio.to_thread(self._extract_text_pages, file_path)
+        logger.info(f"[{document_id}] Extracted {len(pages)} pages, chunking...")
+
+        parent_chunks, child_chunks = await asyncio.to_thread(
+            self.chunking_service.process_document_pages, pages
+        )
+        logger.info(f"[{document_id}] Created {len(parent_chunks)} parent, {len(child_chunks)} child chunks")
+
         if parent_chunks:
             try:
-                self.graph_builder.build_from_texts(
+                logger.info(f"[{document_id}] Building knowledge graph...")
+                await asyncio.to_thread(
+                    self.graph_builder.build_from_texts,
                     [chunk.text for chunk in parent_chunks],
                     document_id,
-                    user_id=user_id
+                    user_id
                 )
+                logger.info(f"[{document_id}] Graph build complete")
             except Exception as exc:
-                print(f"Graph build failed: {exc}")
+                logger.warning(f"[{document_id}] Graph build failed: {exc}")
             finally:
                 self.graph_builder.close()
 
@@ -80,10 +96,18 @@ class MultimodalProcessor:
             user_id=user_id
         )
 
+        logger.info(f"[{document_id}] Indexing {len(pinecone_payload['child_data'])} text chunks to Pinecone...")
         upserted = await self._index_text_chunks(pinecone_payload["child_data"], user_id=user_id)
-        table_entries = self.table_extractor.extract_tables(file_path)
+        logger.info(f"[{document_id}] Upserted {upserted} text vectors")
+
+        logger.info(f"[{document_id}] Extracting tables...")
+        table_entries = await asyncio.to_thread(self.table_extractor.extract_tables, file_path)
         table_upserted = await self._index_tables(table_entries, document_id, user_id=user_id)
+        logger.info(f"[{document_id}] Upserted {table_upserted} table vectors")
+
+        logger.info(f"[{document_id}] Extracting page images...")
         images = await self.image_extractor.extract_page_images(file_path, document_id, user_id=user_id)
+        logger.info(f"[{document_id}] Extracted {len(images)} images")
 
         return {
             "doc_id": document_id,
@@ -125,11 +149,17 @@ class MultimodalProcessor:
             return ""
 
     async def _index_text_chunks(self, child_data: List[Dict[str, Any]], user_id: Optional[str] = None) -> int:
-        """Index child chunks in Pinecone."""
+        """Index child chunks in Pinecone using batch embeddings."""
+        if not child_data:
+            return 0
+
+        # Batch embed all texts at once instead of one-by-one
+        texts = [item["child"].text for item in child_data]
+        embeddings = await self.pinecone_store.get_embeddings_batch(texts)
+
         vectors = []
-        for item in child_data:
+        for item, embedding in zip(child_data, embeddings):
             child = item["child"]
-            embedding = await self.pinecone_store.get_embedding(child.text)
             metadata = {
                 "doc_id": item["doc_id"],
                 "parent_id": item["parent_id"],
@@ -150,11 +180,17 @@ class MultimodalProcessor:
         return result.get("upserted", 0)
 
     async def _index_tables(self, tables: List[Dict[str, Any]], doc_id: str, user_id: Optional[str] = None) -> int:
-        """Index extracted tables as text chunks."""
+        """Index extracted tables as text chunks using batch embeddings."""
+        if not tables:
+            return 0
+
+        # Batch embed all table texts at once
+        texts = [table["markdown"] for table in tables]
+        embeddings = await self.pinecone_store.get_embeddings_batch(texts)
+
         vectors = []
-        for table in tables:
+        for table, embedding in zip(tables, embeddings):
             table_id = str(uuid.uuid4())
-            embedding = await self.pinecone_store.get_embedding(table["markdown"])
             metadata = {
                 "doc_id": doc_id,
                 "page": table["page"],
@@ -169,9 +205,6 @@ class MultimodalProcessor:
                 "values": embedding,
                 "metadata": metadata
             })
-
-        if not vectors:
-            return 0
 
         result = await self.pinecone_store.upsert_vectors(vectors)
         return result.get("upserted", 0)

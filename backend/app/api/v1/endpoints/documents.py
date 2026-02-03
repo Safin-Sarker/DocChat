@@ -1,10 +1,13 @@
 """Document upload endpoints."""
 
+import logging
 from typing import List
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from pathlib import Path
 import uuid
 import aiofiles
+
+logger = logging.getLogger(__name__)
 from app.schemas.document import DocumentUploadResponse, DeleteDocumentResponse, DocumentInfo
 from app.services.multimodal_processor import MultimodalProcessor
 from app.services.storage_service import StorageService
@@ -40,6 +43,8 @@ async def upload_document(
     temp_path = temp_dir / f"{uuid.uuid4()}_{file.filename}"
 
     try:
+        logger.info(f"Upload started: {file.filename} (user: {user_id})")
+
         async with aiofiles.open(temp_path, "wb") as out_file:
             while True:
                 chunk = await file.read(1024 * 1024)
@@ -47,8 +52,12 @@ async def upload_document(
                     break
                 await out_file.write(chunk)
 
+        logger.info(f"File saved to disk, starting processing: {file.filename}")
+
         processor = MultimodalProcessor()
         result = await processor.process_document(str(temp_path), file.filename, user_id=user_id)
+
+        logger.info(f"Processing complete: {file.filename} - {result.get('pages', 0)} pages, {result.get('upserted_vectors', 0)} vectors")
 
         # Save document record to database
         Document.create(
@@ -58,8 +67,12 @@ async def upload_document(
             pages=result.get("pages", 0)
         )
 
+        logger.info(f"Upload finished: {file.filename}")
         return DocumentUploadResponse(**result)
     except Exception as exc:
+        import traceback
+        logger.error(f"Upload failed: {file.filename} - {exc}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         try:

@@ -63,11 +63,29 @@ class PineconeStore:
             print(f"Error getting embedding: {e}")
             raise
 
-    async def upsert_vectors(self, vectors: List[Dict[str, Any]]) -> Dict[str, int]:
-        """Upsert vectors to Pinecone.
+    async def get_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+        """Get OpenAI embeddings for multiple texts in a single batch call.
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            List of embedding vectors
+        """
+        try:
+            if not texts:
+                return []
+            return self.embeddings.embed_documents(texts)
+        except Exception as e:
+            print(f"Error getting batch embeddings: {e}")
+            raise
+
+    async def upsert_vectors(self, vectors: List[Dict[str, Any]], batch_size: int = 100) -> Dict[str, int]:
+        """Upsert vectors to Pinecone in batches.
 
         Args:
             vectors: List of vector dictionaries with id, values, metadata
+            batch_size: Number of vectors per batch (default 100)
 
         Returns:
             Dictionary with upsert statistics
@@ -76,11 +94,15 @@ class PineconeStore:
             if not vectors:
                 return {"upserted": 0}
 
-            # Upsert to Pinecone
-            self.index.upsert(vectors=vectors)
+            # Upsert in batches to avoid API limits
+            total_upserted = 0
+            for i in range(0, len(vectors), batch_size):
+                batch = vectors[i:i + batch_size]
+                self.index.upsert(vectors=batch)
+                total_upserted += len(batch)
 
             return {
-                "upserted": len(vectors),
+                "upserted": total_upserted,
                 "index": self.index_name
             }
         except Exception as e:

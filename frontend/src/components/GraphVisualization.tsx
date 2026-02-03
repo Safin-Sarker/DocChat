@@ -51,16 +51,16 @@ export const GraphVisualization = ({ entities = [] }: GraphVisualizationProps) =
       }))
     );
 
-    const edges = new DataSet(
-      data.nodes.flatMap((node, idx) =>
-        data.nodes.slice(idx + 1).map((target) => ({
-          from: node.id,
-          to: target.id,
-          color: { color: 'rgba(100, 100, 100, 0.3)' },
-          smooth: { type: 'continuous' as const },
-        }))
-      )
+    const edgeData = data.nodes.flatMap((node, idx) =>
+      data.nodes.slice(idx + 1).map((target, edgeIdx) => ({
+        id: `${node.id}-${target.id}-${edgeIdx}`,
+        from: node.id,
+        to: target.id,
+        color: { color: 'rgba(100, 100, 100, 0.3)' },
+      }))
     );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const edges = new DataSet(edgeData) as any;
 
     const options = {
       nodes: {

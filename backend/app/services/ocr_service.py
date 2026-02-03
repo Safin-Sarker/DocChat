@@ -1,7 +1,15 @@
 """OCR service for scanned documents."""
 
+import os
+import sys
 from PIL import Image
 import pytesseract
+
+# Configure Tesseract path for Windows
+if sys.platform == 'win32':
+    tesseract_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    if os.path.exists(tesseract_path):
+        pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 
 class OCRService:

@@ -58,7 +58,7 @@ export const useChatStore = create<ChatStore>()(
           return { messages: newMessages };
         }),
 
-      clearMessages: () => set({ messages: [], entities: [], uploadedDocuments: [] }),
+      clearMessages: () => set({ messages: [], entities: [] }),
 
       setCurrentDoc: (docId) => set({ currentDocId: docId }),
 

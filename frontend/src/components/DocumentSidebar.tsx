@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, FileText, Trash2, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Trash2, FolderOpen, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChatStore } from '@/stores/chatStore';
@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 export function DocumentSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [_isLoading, setIsLoading] = useState(false);
   const { isAuthenticated } = useAuthStore();
   const {
     uploadedDocuments,
