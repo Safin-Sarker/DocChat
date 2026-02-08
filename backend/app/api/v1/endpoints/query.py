@@ -25,7 +25,7 @@ async def query_documents(
 
     try:
         service = AdvancedRAGService()
-        result = await service.answer(payload.query, user_id=user_id)
+        result = await service.answer(payload.query, user_id=user_id, chat_history=payload.chat_history)
         logger.info(f"Query answered: {len(result.get('contexts', []))} contexts, {len(result.get('entities', []))} entities")
         return QueryResponse(**result)
     except Exception as exc:

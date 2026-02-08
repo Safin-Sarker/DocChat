@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     BM25_TOP_K: int = 5
     RERANK_TOP_K: int = 5
 
+    # Judge (LLM-as-a-Judge reflection layer)
+    JUDGE_ENABLED: bool = True
+    JUDGE_MODEL: str = "gpt-4o-mini"
+    JUDGE_TEMPERATURE: float = 0.0
+    JUDGE_THRESHOLD: float = 0.6
+    JUDGE_MAX_RETRIES: int = 1
+
     class Config:
         env_file = [".env", str(Path(__file__).resolve().parents[3] / ".env")]
         case_sensitive = True

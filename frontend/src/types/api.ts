@@ -1,6 +1,19 @@
 // Query Types
 export interface QueryRequest {
   query: string;
+  chat_history?: Array<{ role: string; content: string }>;
+}
+
+export interface ReflectionScore {
+  faithfulness: number;
+  relevance: number;
+  completeness: number;
+  coherence: number;
+  conciseness: number;
+  overall: number;
+  verdict: string;
+  feedback: string;
+  was_regenerated: boolean;
 }
 
 export interface QueryResponse {
@@ -8,6 +21,7 @@ export interface QueryResponse {
   contexts: string[];
   sources: Array<Record<string, any>>;
   entities: string[];
+  reflection?: ReflectionScore | null;
 }
 
 // Document Upload Types
@@ -70,6 +84,7 @@ export interface Message {
   timestamp: Date;
   sources?: Array<Record<string, any>>;
   contexts?: string[];
+  reflection?: ReflectionScore | null;
 }
 
 // API Error Types

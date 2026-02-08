@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { QualityBadge } from './QualityBadge';
 
 interface MessageRowProps {
   message: Message;
@@ -138,6 +139,9 @@ export function MessageRow({ message, onRegenerate, showRegenerate }: MessageRow
               )}
             </div>
           )}
+
+          {/* Quality Badge */}
+          {!isUser && <QualityBadge reflection={message.reflection} />}
 
           {/* Context (collapsible) */}
           {!isUser && message.contexts && message.contexts.length > 0 && (

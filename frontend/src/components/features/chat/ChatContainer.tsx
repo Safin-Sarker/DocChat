@@ -32,9 +32,15 @@ export function ChatContainer() {
 
     setLoading(true);
 
+    // Build chat history from recent messages (max 10) for follow-up context
+    const recentHistory = messages
+      .filter((m) => m.content) // skip empty placeholder messages
+      .slice(-10)
+      .map((m) => ({ role: m.role, content: m.content }));
+
     // Query RAG
     queryRAG(
-      { query: userMessage },
+      { query: userMessage, chat_history: recentHistory },
       {
         onSuccess: (response) => {
           useChatStore.setState((state) => {
@@ -45,6 +51,7 @@ export function ChatContainer() {
                 content: response.answer,
                 sources: response.sources,
                 contexts: response.contexts,
+                reflection: response.reflection,
               };
             }
             return { messages: newMessages };

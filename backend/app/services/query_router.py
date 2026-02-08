@@ -2,6 +2,7 @@
 
 import json
 import logging
+from typing import Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.core.config import settings
@@ -61,14 +62,25 @@ class QueryRouter:
             logger.warning(f"Query router failed, defaulting to document_query: {exc}")
             return "document_query"
 
-    def generate_casual_response(self, query: str) -> str:
+    def generate_casual_response(self, query: str, chat_history: Optional[list] = None) -> str:
         """Generate a direct response for non-document queries."""
-        response = self.client.invoke([
+        from langchain_core.messages import AIMessage
+
+        messages = [
             SystemMessage(content=(
                 "You are DocChat, a friendly document Q&A assistant. "
                 "Respond briefly to the user's message. "
                 "If they greet you, greet them back and let them know you're ready to help with their documents."
-            )),
-            HumanMessage(content=query)
-        ])
+            ))
+        ]
+
+        for msg in (chat_history or []):
+            if msg.role == "user":
+                messages.append(HumanMessage(content=msg.content))
+            elif msg.role == "assistant":
+                messages.append(AIMessage(content=msg.content))
+
+        messages.append(HumanMessage(content=query))
+
+        response = self.client.invoke(messages)
         return response.content or ""

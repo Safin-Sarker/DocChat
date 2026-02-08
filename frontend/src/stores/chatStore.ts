@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Message, UploadedDocument } from '../types/api';
+import type { Message, UploadedDocument, ReflectionScore } from '../types/api';
 
 interface ChatStore {
   messages: Message[];
@@ -10,7 +10,7 @@ interface ChatStore {
   serverSessionId: string | null;
   uploadedDocuments: UploadedDocument[];
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
-  updateLastMessage: (content: string, sources?: Array<Record<string, any>>, contexts?: string[]) => void;
+  updateLastMessage: (content: string, sources?: Array<Record<string, any>>, contexts?: string[], reflection?: ReflectionScore | null) => void;
   clearMessages: () => void;
   setCurrentDoc: (docId: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -43,7 +43,7 @@ export const useChatStore = create<ChatStore>()(
           ],
         })),
 
-      updateLastMessage: (content, sources, contexts) =>
+      updateLastMessage: (content, sources, contexts, reflection) =>
         set((state) => {
           const newMessages = [...state.messages];
           if (newMessages.length > 0) {
@@ -53,6 +53,7 @@ export const useChatStore = create<ChatStore>()(
               content,
               sources,
               contexts,
+              reflection,
             };
           }
           return { messages: newMessages };
