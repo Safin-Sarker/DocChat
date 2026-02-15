@@ -15,7 +15,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isConnected, setIsConnected] = useState(true);
 
   const { isOpen: isUploadModalOpen, isUploading, open: openUploadModal, close: closeUploadModal } = useUploadModal();

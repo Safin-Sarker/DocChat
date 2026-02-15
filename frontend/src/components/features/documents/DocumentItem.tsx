@@ -69,9 +69,9 @@ export function DocumentItem({
   return (
     <div
       className={cn(
-        'group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors',
+        'group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors duration-200',
         isSelected
-          ? 'bg-primary/10 text-primary'
+          ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
           : 'hover:bg-accent text-foreground'
       )}
       onClick={onToggle}
@@ -115,7 +115,7 @@ export function DocumentItem({
             <p>{document.filename}</p>
           </TooltipContent>
         </Tooltip>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground/70">
           {document.pages} {document.pages === 1 ? 'page' : 'pages'} · {formatDate(document.uploadedAt)}
         </p>
       </div>
@@ -124,8 +124,8 @@ export function DocumentItem({
         variant="ghost"
         size="icon"
         className={cn(
-          'h-7 w-7 min-w-[28px] flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors',
-          isDeleting && 'text-destructive'
+          'h-7 w-7 min-w-[28px] flex-shrink-0 text-muted-foreground hover:text-destructive transition-all duration-200',
+          isDeleting ? 'text-destructive opacity-100' : 'opacity-0 group-hover:opacity-100'
         )}
         disabled={isDeleting}
         onClick={handleDelete}

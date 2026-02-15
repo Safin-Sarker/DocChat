@@ -201,6 +201,17 @@
     @apply text-primary underline underline-offset-2 hover:text-primary/80 transition-colors;
   }
 
+  /* User bubble prose styles */
+  .prose-chat-user {
+    @apply text-primary-foreground leading-relaxed;
+  }
+  .prose-chat-user p { @apply mb-2 last:mb-0; }
+  .prose-chat-user ul, .prose-chat-user ol { @apply mb-2 pl-5 space-y-0.5; }
+  .prose-chat-user ul { @apply list-disc; }
+  .prose-chat-user ol { @apply list-decimal; }
+  .prose-chat-user code:not(pre code) { @apply bg-white/20 px-1.5 py-0.5 rounded-md text-sm font-mono; }
+  .prose-chat-user a { @apply text-primary-foreground underline underline-offset-2; }
+
   .prose-chat table {
     @apply w-full border-collapse my-3;
   }

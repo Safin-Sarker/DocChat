@@ -57,7 +57,8 @@ export function ChatMessages({ messages, isLoading, onRegenerate }: ChatMessages
         ref={scrollAreaRef}
         className="h-full overflow-y-auto scrollbar-thin"
       >
-        <div className="divide-y divide-border/50">
+        <div>
+          <div className="h-2" />
           {messages.map((message, index) => (
             <MessageRow
               key={message.id}
@@ -80,7 +81,7 @@ export function ChatMessages({ messages, isLoading, onRegenerate }: ChatMessages
         variant="secondary"
         size="sm"
         className={cn(
-          'absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg transition-all duration-200',
+          'absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg transition-all duration-200 rounded-full px-4',
           showScrollButton
             ? 'opacity-100 translate-y-0'
             : 'opacity-0 translate-y-4 pointer-events-none'

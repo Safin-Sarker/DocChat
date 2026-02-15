@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { UserMenu } from '@/components/shared/UserMenu';
 import { DocumentList } from '@/components/features/documents/DocumentList';
 import { useChatStore } from '@/stores/chatStore';
@@ -20,7 +19,7 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
   const [isLoading, setIsLoading] = useState(false);
   const hasFetched = useRef(false);
   const { isAuthenticated } = useAuthStore();
-  const { clearMessages, clearDocSelection } = useChatStore();
+  const { clearMessages, clearDocSelection, uploadedDocuments } = useChatStore();
 
   // Fetch documents only once on mount
   useEffect(() => {
@@ -48,6 +47,8 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
     clearDocSelection();
   };
 
+  const docCount = uploadedDocuments.length;
+
   return (
     <>
       {/* Mobile overlay */}
@@ -61,8 +62,8 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-[260px] bg-background border-r flex flex-col transition-transform duration-300 ease-in-out lg:static lg:translate-x-0',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed inset-y-0 left-0 z-50 w-[260px] bg-muted/30 border-r border-border/50 flex flex-col transition-transform duration-300 ease-in-out lg:static',
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:hidden'
         )}
       >
         {/* Mobile close button */}
@@ -74,10 +75,10 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
         </div>
 
         {/* Action buttons */}
-        <div className="p-3 space-y-2">
+        <div className="mx-2 mt-2 rounded-lg bg-background/60 p-2 space-y-2">
           <Button
             variant="outline"
-            className="w-full justify-start gap-2"
+            className="w-full justify-start gap-2 h-9 text-sm rounded-lg"
             onClick={handleNewChat}
           >
             <Plus className="h-4 w-4" />
@@ -85,7 +86,7 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
           </Button>
           <Button
             variant="default"
-            className="w-full justify-start gap-2"
+            className="w-full justify-start gap-2 h-9 text-sm rounded-lg shadow-sm hover:shadow-md transition-shadow"
             onClick={() => {
               onUploadClick();
               onClose();
@@ -96,14 +97,19 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
           </Button>
         </div>
 
-        <Separator />
+        <div className="h-3" />
 
         {/* Documents section */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="px-3 py-2">
+          <div className="px-3 py-2 flex items-center gap-2">
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Documents
             </h3>
+            {docCount > 0 && (
+              <span className="text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                {docCount}
+              </span>
+            )}
           </div>
           <ScrollArea className="flex-1">
             <div className="px-2 pr-3">
@@ -112,7 +118,7 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
           </ScrollArea>
         </div>
 
-        <Separator />
+        <div className="mx-3 border-t border-border/30" />
 
         {/* User section */}
         <div className="p-3">

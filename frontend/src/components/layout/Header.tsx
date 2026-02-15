@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeft, Wifi, WifiOff } from 'lucide-react';
+import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -20,12 +20,12 @@ export function Header({
   onToggleSidebar,
 }: HeaderProps) {
   return (
-    <header className="h-14 border-b bg-background/95 backdrop-blur-safe sticky top-0 z-50 flex items-center justify-between px-4">
+    <header className="h-14 border-b border-border/40 bg-background/95 backdrop-blur-safe sticky top-0 z-50 flex items-center justify-between px-4 shadow-[0_1px_3px_0_rgb(0_0_0/0.02)]">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 lg:hidden"
+          className="h-8 w-8"
           onClick={onToggleSidebar}
           aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
         >
@@ -49,11 +49,14 @@ export function Header({
                   : 'bg-destructive/10 text-destructive'
               )}
             >
-              {isConnected ? (
-                <Wifi className="h-3 w-3" />
-              ) : (
-                <WifiOff className="h-3 w-3" />
-              )}
+              <div
+                className={cn(
+                  'h-2 w-2 rounded-full',
+                  isConnected
+                    ? 'bg-green-500 shadow-[0_0_6px_1px_rgb(34_197_94/0.4)]'
+                    : 'bg-destructive animate-pulse'
+                )}
+              />
               <span className="hidden sm:inline">
                 {isConnected ? 'Connected' : 'Disconnected'}
               </span>
