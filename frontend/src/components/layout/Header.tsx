@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeft } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -22,19 +22,23 @@ export function Header({
   return (
     <header className="h-14 border-b border-border/40 bg-background/95 backdrop-blur-safe sticky top-0 z-50 flex items-center justify-between px-4 shadow-[0_1px_3px_0_rgb(0_0_0/0.02)]">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={onToggleSidebar}
-          aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-        >
-          {isSidebarOpen ? (
-            <PanelLeftClose className="h-5 w-5" />
-          ) : (
-            <PanelLeft className="h-5 w-5" />
-          )}
-        </Button>
+        {/* Only show open-sidebar button when sidebar is hidden */}
+        {!isSidebarOpen && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg hover:bg-muted"
+                onClick={onToggleSidebar}
+                aria-label="Open sidebar"
+              >
+                <PanelLeft className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Open sidebar</TooltipContent>
+          </Tooltip>
+        )}
         <Logo size="md" />
       </div>
 

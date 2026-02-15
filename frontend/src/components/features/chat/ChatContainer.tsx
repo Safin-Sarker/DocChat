@@ -71,7 +71,7 @@ export function ChatContainer() {
   if (messages.length === 0) {
     return (
       <div className="flex flex-col h-full">
-        <WelcomeScreen hasDocument={hasDocsSelected} />
+        <WelcomeScreen hasDocument={hasDocsSelected} hasUploadedDocs={uploadedDocuments.length > 0} />
         {hasDocsSelected && (
           <ChatInput
             onSubmit={handleSubmit}

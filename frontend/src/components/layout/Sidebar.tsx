@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Upload, X } from 'lucide-react';
+import { Plus, Upload, PanelLeftClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserMenu } from '@/components/shared/UserMenu';
@@ -12,10 +12,11 @@ import { cn } from '@/lib/utils';
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onToggleSidebar: () => void;
   onUploadClick: () => void;
 }
 
-export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, onToggleSidebar, onUploadClick }: SidebarProps) {
   const [isLoading, setIsLoading] = useState(false);
   const hasFetched = useRef(false);
   const { isAuthenticated } = useAuthStore();
@@ -66,16 +67,21 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full lg:hidden'
         )}
       >
-        {/* Mobile close button */}
-        <div className="flex items-center justify-between p-4 lg:hidden">
-          <span className="font-semibold">Menu</span>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
+        {/* Top row: collapse button */}
+        <div className="flex items-center p-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onToggleSidebar}
+            aria-label="Close sidebar"
+          >
+            <PanelLeftClose className="h-5 w-5" />
           </Button>
         </div>
 
         {/* Action buttons */}
-        <div className="mx-2 mt-2 rounded-lg bg-background/60 p-2 space-y-2">
+        <div className="mx-2 space-y-1.5">
           <Button
             variant="outline"
             className="w-full justify-start gap-2 h-9 text-sm rounded-lg"
@@ -97,7 +103,7 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
           </Button>
         </div>
 
-        <div className="h-3" />
+        <div className="h-2" />
 
         {/* Documents section */}
         <div className="flex-1 overflow-hidden flex flex-col">

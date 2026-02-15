@@ -79,21 +79,44 @@ class Reranker:
             scored_docs.sort(key=lambda x: x[0], reverse=True)
             return [doc for _, doc in scored_docs[:top_k]]
 
-        # Check how many distinct documents remain after filtering
-        doc_id_set = set()
-        for _, doc in scored_docs:
+        # Find best score per document to detect irrelevant documents
+        best_per_doc: Dict[str, float] = {}
+        for score, doc in scored_docs:
             did = doc.get("metadata", {}).get("doc_id")
             if did:
-                doc_id_set.add(did)
+                if did not in best_per_doc or score > best_per_doc[did]:
+                    best_per_doc[did] = score
 
         # If only one document or no doc_ids, return top K globally
-        if len(doc_id_set) <= 1:
+        if len(best_per_doc) <= 1:
+            return [doc for _, doc in scored_docs[:top_k]]
+
+        # Drop documents whose best chunk scores much lower than the
+        # top document — they are likely irrelevant to the query.
+        top_doc_score = max(best_per_doc.values())
+        DOC_GAP_THRESHOLD = 0.05
+        relevant_doc_ids = {
+            did for did, score in best_per_doc.items()
+            if top_doc_score - score <= DOC_GAP_THRESHOLD
+        }
+
+        # Filter to only chunks from relevant documents
+        scored_docs = [
+            (s, d) for s, d in scored_docs
+            if d.get("metadata", {}).get("doc_id") in relevant_doc_ids
+        ]
+
+        if not scored_docs:
+            return []
+
+        # If only one relevant document remains, return top K globally
+        if len(relevant_doc_ids) <= 1:
             return [doc for _, doc in scored_docs[:top_k]]
 
         # Balanced selection: guarantee at least min_per_doc from each document
-        min_per_doc = max(1, top_k // len(doc_id_set))
+        min_per_doc = max(1, top_k // len(relevant_doc_ids))
         result = []
-        doc_counts: Dict[str, int] = {did: 0 for did in doc_id_set}
+        doc_counts: Dict[str, int] = {did: 0 for did in relevant_doc_ids}
 
         # First pass: pick top chunk from each document to guarantee coverage
         for score, doc in scored_docs:

@@ -76,6 +76,7 @@ export function AppShell({ children }: AppShellProps) {
           <Sidebar
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
             onUploadClick={openUploadModal}
           />
 

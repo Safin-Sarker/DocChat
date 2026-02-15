@@ -5,10 +5,23 @@ import { useUploadModal } from '@/hooks/useUploadModal';
 
 interface WelcomeScreenProps {
   hasDocument: boolean;
+  hasUploadedDocs?: boolean;
 }
 
-export function WelcomeScreen({ hasDocument }: WelcomeScreenProps) {
+export function WelcomeScreen({ hasDocument, hasUploadedDocs = false }: WelcomeScreenProps) {
   const { open: openUploadModal } = useUploadModal();
+
+  const heading = hasDocument
+    ? 'Start a conversation'
+    : hasUploadedDocs
+      ? 'Select a document'
+      : 'Welcome to DocChat';
+
+  const subtitle = hasDocument
+    ? 'Ask questions about your uploaded document'
+    : hasUploadedDocs
+      ? 'Choose a document from the sidebar to start chatting'
+      : 'Upload a document and start asking questions about it';
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 animate-in">
@@ -17,16 +30,14 @@ export function WelcomeScreen({ hasDocument }: WelcomeScreenProps) {
 
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight text-foreground text-balance">
-            {hasDocument ? 'Start a conversation' : 'Welcome to DocChat'}
+            {heading}
           </h1>
           <p className="text-muted-foreground">
-            {hasDocument
-              ? 'Ask questions about your uploaded document'
-              : 'Upload a document and start asking questions about it'}
+            {subtitle}
           </p>
         </div>
 
-        {!hasDocument && (
+        {!hasDocument && !hasUploadedDocs && (
           <Button onClick={openUploadModal} size="lg" className="gap-2">
             <Upload className="h-4 w-4" />
             Upload Document
