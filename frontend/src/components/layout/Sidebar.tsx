@@ -20,7 +20,7 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
   const [isLoading, setIsLoading] = useState(false);
   const hasFetched = useRef(false);
   const { isAuthenticated } = useAuthStore();
-  const { clearMessages, setCurrentDoc } = useChatStore();
+  const { clearMessages, clearDocSelection } = useChatStore();
 
   // Fetch documents only once on mount
   useEffect(() => {
@@ -45,7 +45,7 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
 
   const handleNewChat = () => {
     clearMessages();
-    setCurrentDoc(null);
+    clearDocSelection();
   };
 
   return (
@@ -105,8 +105,10 @@ export function Sidebar({ isOpen, onClose, onUploadClick }: SidebarProps) {
               Documents
             </h3>
           </div>
-          <ScrollArea className="flex-1 px-2">
-            <DocumentList isLoading={isLoading} />
+          <ScrollArea className="flex-1">
+            <div className="px-2 pr-3">
+              <DocumentList isLoading={isLoading} />
+            </div>
           </ScrollArea>
         </div>
 

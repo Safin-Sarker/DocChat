@@ -1,7 +1,9 @@
 """Query endpoint for RAG responses."""
 
+import json
 import logging
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from app.schemas.query import QueryRequest, QueryResponse
 from app.services.advanced_rag import AdvancedRAGService
 from app.core.auth import get_current_user
@@ -25,7 +27,7 @@ async def query_documents(
 
     try:
         service = AdvancedRAGService()
-        result = await service.answer(payload.query, user_id=user_id, chat_history=payload.chat_history)
+        result = await service.answer(payload.query, user_id=user_id, chat_history=payload.chat_history, doc_ids=payload.doc_ids or None)
         logger.info(f"Query answered: {len(result.get('contexts', []))} contexts, {len(result.get('entities', []))} entities")
         return QueryResponse(**result)
     except Exception as exc:
@@ -33,3 +35,40 @@ async def query_documents(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/stream")
+async def query_documents_stream(
+    payload: QueryRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Stream an answer using Server-Sent Events (requires authentication)."""
+    if not payload.query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+
+    user_id = current_user["user_id"]
+    logger.info(f"Stream query from user {user_id}: {payload.query[:100]}")
+
+    async def event_generator():
+        try:
+            service = AdvancedRAGService()
+            async for event_type, data in service.answer_stream(
+                payload.query,
+                user_id=user_id,
+                chat_history=payload.chat_history,
+                doc_ids=payload.doc_ids or None
+            ):
+                yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+        except Exception as exc:
+            logger.error(f"Streaming query failed: {exc}")
+            yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )

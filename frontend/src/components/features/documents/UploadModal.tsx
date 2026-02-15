@@ -34,7 +34,6 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     reset,
   } = useDocumentUpload();
 
-  const setCurrentDoc = useChatStore((state) => state.setCurrentDoc);
   const addUploadedDocument = useChatStore((state) => state.addUploadedDocument);
   const { setUploading } = useUploadModal();
 
@@ -95,7 +94,6 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
 
         uploadDocument(file, {
           onSuccess: (response) => {
-            setCurrentDoc(response.doc_id);
             addUploadedDocument({
               doc_id: response.doc_id,
               filename: file.name,
@@ -106,7 +104,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
         });
       }
     },
-    [uploadDocument, setCurrentDoc, addUploadedDocument]
+    [uploadDocument, addUploadedDocument]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

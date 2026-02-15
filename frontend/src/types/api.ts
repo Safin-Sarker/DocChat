@@ -2,6 +2,20 @@
 export interface QueryRequest {
   query: string;
   chat_history?: Array<{ role: string; content: string }>;
+  doc_ids?: string[];
+}
+
+// SSE Streaming Types
+export type SSEStage = 'routing' | 'retrieving' | 'reranking' | 'generating' | 'evaluating' | 'improving' | 'extracting';
+
+export interface SSETokenEvent {
+  content: string;
+  replace?: boolean;
+}
+
+export interface SSESourcesEvent {
+  sources: Array<Record<string, any>>;
+  contexts: string[];
 }
 
 export interface ReflectionScore {

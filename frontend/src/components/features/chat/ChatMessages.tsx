@@ -47,6 +47,10 @@ export function ChatMessages({ messages, isLoading, onRegenerate }: ChatMessages
     -1
   );
 
+  // Show typing indicator only when loading and the last message has no content yet
+  const lastMessage = messages[messages.length - 1];
+  const showTyping = isLoading && (!lastMessage || !lastMessage.content);
+
   return (
     <div className="relative flex-1 overflow-hidden">
       <div
@@ -66,7 +70,7 @@ export function ChatMessages({ messages, isLoading, onRegenerate }: ChatMessages
               showRegenerate={index === lastAssistantIndex && !isLoading}
             />
           ))}
-          {isLoading && <TypingIndicator />}
+          {showTyping && <TypingIndicator />}
         </div>
         <div ref={messagesEndRef} className="h-1" />
       </div>

@@ -85,7 +85,7 @@ def test_neo4j():
         return True
     except Exception as e:
         print(f"[FAIL] Neo4j connection failed: {e}")
-        print("   Make sure Neo4j is running: docker-compose up -d")
+        print("   Check your Neo4j Aura credentials in .env")
         return False
 
 

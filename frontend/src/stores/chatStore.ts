@@ -1,21 +1,32 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Message, UploadedDocument, ReflectionScore } from '../types/api';
+import type { Message, UploadedDocument, ReflectionScore, SSEStage } from '../types/api';
 
 interface ChatStore {
   messages: Message[];
   currentDocId: string | null;
+  selectedDocIds: string[];
+  selectAllDocs: boolean;
   isLoading: boolean;
   entities: string[];
   serverSessionId: string | null;
   uploadedDocuments: UploadedDocument[];
+  streamingStage: SSEStage | null;
+
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
   updateLastMessage: (content: string, sources?: Array<Record<string, any>>, contexts?: string[], reflection?: ReflectionScore | null) => void;
+  appendToLastMessage: (token: string) => void;
+  replaceLastMessageContent: (content: string) => void;
+  updateLastMessageMeta: (sources?: Array<Record<string, any>>, contexts?: string[], reflection?: ReflectionScore | null) => void;
   clearMessages: () => void;
   setCurrentDoc: (docId: string | null) => void;
+  toggleDocSelection: (docId: string) => void;
+  setSelectAllDocs: (selectAll: boolean) => void;
+  clearDocSelection: () => void;
   setLoading: (loading: boolean) => void;
   setEntities: (entities: string[]) => void;
   setServerSessionId: (id: string | null) => void;
+  setStreamingStage: (stage: SSEStage | null) => void;
   addUploadedDocument: (doc: UploadedDocument) => void;
   removeUploadedDocument: (docId: string) => void;
   setUploadedDocuments: (docs: UploadedDocument[]) => void;
@@ -26,10 +37,13 @@ export const useChatStore = create<ChatStore>()(
     (set) => ({
       messages: [],
       currentDocId: null,
+      selectedDocIds: [],
+      selectAllDocs: false,
       isLoading: false,
       entities: [],
       serverSessionId: null,
       uploadedDocuments: [],
+      streamingStage: null,
 
       addMessage: (message) =>
         set((state) => ({
@@ -59,9 +73,74 @@ export const useChatStore = create<ChatStore>()(
           return { messages: newMessages };
         }),
 
+      appendToLastMessage: (token) =>
+        set((state) => {
+          const newMessages = [...state.messages];
+          if (newMessages.length > 0) {
+            const last = newMessages[newMessages.length - 1];
+            newMessages[newMessages.length - 1] = {
+              ...last,
+              content: last.content + token,
+            };
+          }
+          return { messages: newMessages };
+        }),
+
+      replaceLastMessageContent: (content) =>
+        set((state) => {
+          const newMessages = [...state.messages];
+          if (newMessages.length > 0) {
+            newMessages[newMessages.length - 1] = {
+              ...newMessages[newMessages.length - 1],
+              content,
+            };
+          }
+          return { messages: newMessages };
+        }),
+
+      updateLastMessageMeta: (sources, contexts, reflection) =>
+        set((state) => {
+          const newMessages = [...state.messages];
+          if (newMessages.length > 0) {
+            const last = newMessages[newMessages.length - 1];
+            newMessages[newMessages.length - 1] = {
+              ...last,
+              ...(sources !== undefined && { sources }),
+              ...(contexts !== undefined && { contexts }),
+              ...(reflection !== undefined && { reflection }),
+            };
+          }
+          return { messages: newMessages };
+        }),
+
       clearMessages: () => set({ messages: [], entities: [] }),
 
       setCurrentDoc: (docId) => set({ currentDocId: docId }),
+
+      toggleDocSelection: (docId) =>
+        set((state) => {
+          const isSelected = state.selectedDocIds.includes(docId);
+          const newSelectedIds = isSelected
+            ? state.selectedDocIds.filter((id) => id !== docId)
+            : [...state.selectedDocIds, docId];
+          return {
+            selectedDocIds: newSelectedIds,
+            selectAllDocs: false,
+            currentDocId: newSelectedIds.length === 1 ? newSelectedIds[0] : state.currentDocId,
+          };
+        }),
+
+      setSelectAllDocs: (selectAll) =>
+        set((state) => ({
+          selectAllDocs: selectAll,
+          selectedDocIds: selectAll
+            ? state.uploadedDocuments.map((d) => d.doc_id)
+            : [],
+          currentDocId: null,
+        })),
+
+      clearDocSelection: () =>
+        set({ selectedDocIds: [], selectAllDocs: false, currentDocId: null }),
 
       setLoading: (loading) => set({ isLoading: loading }),
 
@@ -69,14 +148,18 @@ export const useChatStore = create<ChatStore>()(
 
       setServerSessionId: (id) => set({ serverSessionId: id }),
 
+      setStreamingStage: (stage) => set({ streamingStage: stage }),
+
       addUploadedDocument: (doc) =>
         set((state) => ({
           uploadedDocuments: [...state.uploadedDocuments, doc],
+          selectedDocIds: [...state.selectedDocIds, doc.doc_id],
         })),
 
       removeUploadedDocument: (docId) =>
         set((state) => ({
           uploadedDocuments: state.uploadedDocuments.filter((d) => d.doc_id !== docId),
+          selectedDocIds: state.selectedDocIds.filter((id) => id !== docId),
           currentDocId: state.currentDocId === docId ? null : state.currentDocId,
         })),
 
@@ -86,6 +169,8 @@ export const useChatStore = create<ChatStore>()(
       name: 'docchat-storage',
       partialize: (state) => ({
         currentDocId: state.currentDocId,
+        selectedDocIds: state.selectedDocIds,
+        selectAllDocs: state.selectAllDocs,
         entities: state.entities,
         messages: state.messages,
         serverSessionId: state.serverSessionId,

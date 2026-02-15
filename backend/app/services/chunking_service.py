@@ -1,5 +1,6 @@
 """Parent-child chunking service for advanced RAG."""
 
+import re
 from typing import List, Dict, Tuple, Optional
 import uuid
 from dataclasses import dataclass
@@ -132,11 +133,86 @@ class ChunkingService:
 
         return parent_child_chunks
 
+    # Section header pattern: lines that are short, title-cased/ALL CAPS,
+    # optionally ending with a colon — typical of CVs and structured docs.
+    _HEADER_RE = re.compile(
+        r"^(?:"
+        r"[A-Z][A-Z /&\-]{2,40}$"        # ALL CAPS header (e.g. "LANGUAGES")
+        r"|[A-Z][a-zA-Z /&\-]{2,40}:$"   # Title case ending with colon
+        r"|[A-Z][a-zA-Z /&\-]{2,40}$"    # Title case standalone line
+        r")",
+        re.MULTILINE,
+    )
+
+    def detect_structured_document(self, text: str) -> bool:
+        """Return True if the text has enough section-like headers (>=3)."""
+        headers = self._HEADER_RE.findall(text)
+        return len(headers) >= 3
+
+    def create_section_aware_chunks(self, text: str, page: int = 0) -> List[ParentChildChunk]:
+        """Split text on section boundaries instead of fixed character counts.
+
+        Each detected section (header + body) becomes its own parent chunk.
+        Sections exceeding parent_size fall back to character-based chunking.
+        """
+        lines = text.split("\n")
+        sections: List[Tuple[str, int]] = []  # (section_text, start_char)
+        current_section_lines: List[str] = []
+        current_start = 0
+        char_pos = 0
+
+        for line in lines:
+            is_header = bool(self._HEADER_RE.match(line.strip()))
+            if is_header and current_section_lines:
+                # Flush the previous section
+                section_text = "\n".join(current_section_lines).strip()
+                if section_text:
+                    sections.append((section_text, current_start))
+                current_section_lines = [line]
+                current_start = char_pos
+            else:
+                current_section_lines.append(line)
+            char_pos += len(line) + 1  # +1 for newline
+
+        # Flush last section
+        if current_section_lines:
+            section_text = "\n".join(current_section_lines).strip()
+            if section_text:
+                sections.append((section_text, current_start))
+
+        parent_child_chunks = []
+        for section_text, start in sections:
+            if len(section_text) > self.parent_size:
+                # Section too large — fall back to character-based chunking
+                pc_chunks = self.create_parent_child_chunks(section_text, page=page)
+                parent_child_chunks.extend(pc_chunks)
+            else:
+                # Section fits in one parent chunk
+                parent = Chunk(
+                    id=str(uuid.uuid4()),
+                    text=section_text,
+                    page=page,
+                    start_char=start,
+                    end_char=start + len(section_text),
+                )
+                children = self.create_chunks(
+                    text=section_text,
+                    chunk_size=self.child_size,
+                    overlap=self.child_overlap,
+                    page=page,
+                )
+                parent_child_chunks.append(ParentChildChunk(parent=parent, children=children))
+
+        return parent_child_chunks
+
     def process_document_pages(
         self,
         pages: List[Dict[str, any]]
     ) -> Tuple[List[Chunk], List[Chunk]]:
         """Process multiple pages and return parent and child chunks.
+
+        Concatenates all pages first and uses section-aware chunking for
+        structured documents (CVs, resumes, specs with clear headers).
 
         Args:
             pages: List of page dictionaries with 'text' and 'page_num' keys
@@ -147,19 +223,36 @@ class ChunkingService:
         all_parents = []
         all_children = []
 
-        for page_data in pages:
-            text = page_data.get("text", "")
-            page_num = page_data.get("page_num", 0)
+        # Concatenate all page texts to detect structure across the full document
+        full_text = "\n\n".join(
+            page_data.get("text", "")
+            for page_data in pages
+            if page_data.get("text", "").strip()
+        )
 
-            if not text.strip():
-                continue
+        if not full_text.strip():
+            return all_parents, all_children
 
-            # Create parent-child structure
-            pc_chunks = self.create_parent_child_chunks(text, page=page_num)
-
+        if self.detect_structured_document(full_text):
+            # Section-aware chunking for structured docs
+            pc_chunks = self.create_section_aware_chunks(full_text, page=0)
             for pc_chunk in pc_chunks:
                 all_parents.append(pc_chunk.parent)
                 all_children.extend(pc_chunk.children)
+        else:
+            # Standard per-page character-based chunking
+            for page_data in pages:
+                text = page_data.get("text", "")
+                page_num = page_data.get("page_num", 0)
+
+                if not text.strip():
+                    continue
+
+                pc_chunks = self.create_parent_child_chunks(text, page=page_num)
+
+                for pc_chunk in pc_chunks:
+                    all_parents.append(pc_chunk.parent)
+                    all_children.extend(pc_chunk.children)
 
         return all_parents, all_children
 

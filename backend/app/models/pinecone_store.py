@@ -153,7 +153,8 @@ class PineconeStore:
         query_text: str,
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        doc_ids: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """Query Pinecone using text (automatically generates embedding).
 
@@ -162,6 +163,7 @@ class PineconeStore:
             top_k: Number of results to return
             filter: Metadata filter
             user_id: User ID for filtering (required for multi-tenant isolation)
+            doc_ids: List of document IDs to filter by (empty/None = all documents)
 
         Returns:
             List of matching results
@@ -170,6 +172,8 @@ class PineconeStore:
         query_filter = filter.copy() if filter else {}
         if user_id:
             query_filter["user_id"] = user_id
+        if doc_ids:
+            query_filter["doc_id"] = {"$in": doc_ids}
 
         query_vector = await self.get_embedding(query_text)
         return await self.query(query_vector, top_k, query_filter if query_filter else None)

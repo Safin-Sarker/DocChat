@@ -16,6 +16,7 @@ class QueryRequest(BaseModel):
 
     query: str
     chat_history: List[ChatMessage] = []
+    doc_ids: List[str] = []  # Empty = search all documents
 
 
 class ReflectionScore(BaseModel):

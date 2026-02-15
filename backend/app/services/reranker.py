@@ -1,7 +1,7 @@
 """Reranker wrapper using OpenAI embeddings."""
 
-from typing import List, Dict, Any
-from math import sqrt
+from typing import List, Dict, Any, Optional
+from math import sqrt, ceil
 from openai import OpenAI
 from app.core.config import settings
 
@@ -27,18 +27,26 @@ class Reranker:
         return dot / (norm_a * norm_b)
 
     async def rerank(self, query: str, docs: List[Dict[str, Any]], top_k: int) -> List[Dict[str, Any]]:
-        """Rerank documents by relevance."""
+        """Rerank documents by relevance with balanced document coverage.
+
+        When results come from multiple documents, ensures each document
+        gets at least a minimum number of slots in the final results.
+        """
         if not docs:
             return []
 
         if not self.openai_client:
-            return docs[:top_k]
+            return self._balanced_select(docs, top_k)
 
         try:
             return await self._rerank_with_openai(query, docs, top_k)
         except Exception as exc:
             print(f"OpenAI reranking failed: {exc}")
-            return docs[:top_k]
+            return self._balanced_select(docs, top_k)
+
+    # Minimum cosine similarity for a chunk to be considered relevant.
+    # Chunks below this threshold are dropped before balanced selection.
+    RELEVANCE_THRESHOLD = 0.75
 
     async def _rerank_with_openai(
         self, query: str, docs: List[Dict[str, Any]], top_k: int
@@ -54,5 +62,85 @@ class Reranker:
             self._cosine_similarity(query_vec, doc_vec)
             for doc_vec in doc_vecs
         ]
-        ranked_indices = sorted(range(len(docs)), key=lambda i: scores[i], reverse=True)
-        return [docs[i] for i in ranked_indices[:top_k]]
+
+        # Score and sort all docs
+        scored_docs = [(scores[i], docs[i]) for i in range(len(docs))]
+        scored_docs.sort(key=lambda x: x[0], reverse=True)
+
+        # Drop chunks below the relevance threshold so irrelevant documents
+        # don't get forced into results by balanced selection.
+        scored_docs = [
+            (s, d) for s, d in scored_docs if s >= self.RELEVANCE_THRESHOLD
+        ]
+
+        if not scored_docs:
+            # Fallback: nothing passed the threshold, return the best we have
+            scored_docs = [(scores[i], docs[i]) for i in range(len(docs))]
+            scored_docs.sort(key=lambda x: x[0], reverse=True)
+            return [doc for _, doc in scored_docs[:top_k]]
+
+        # Check how many distinct documents remain after filtering
+        doc_id_set = set()
+        for _, doc in scored_docs:
+            did = doc.get("metadata", {}).get("doc_id")
+            if did:
+                doc_id_set.add(did)
+
+        # If only one document or no doc_ids, return top K globally
+        if len(doc_id_set) <= 1:
+            return [doc for _, doc in scored_docs[:top_k]]
+
+        # Balanced selection: guarantee at least min_per_doc from each document
+        min_per_doc = max(1, top_k // len(doc_id_set))
+        result = []
+        doc_counts: Dict[str, int] = {did: 0 for did in doc_id_set}
+
+        # First pass: pick top chunk from each document to guarantee coverage
+        for score, doc in scored_docs:
+            did = doc.get("metadata", {}).get("doc_id", "")
+            if did in doc_counts and doc_counts[did] < min_per_doc:
+                result.append(doc)
+                doc_counts[did] += 1
+
+        # Second pass: fill remaining slots with highest-scored chunks
+        remaining = top_k - len(result)
+        result_ids = {id(d) for d in result}
+        for score, doc in scored_docs:
+            if remaining <= 0:
+                break
+            if id(doc) not in result_ids:
+                result.append(doc)
+                remaining -= 1
+
+        return result[:top_k]
+
+    @staticmethod
+    def _balanced_select(docs: List[Dict[str, Any]], top_k: int) -> List[Dict[str, Any]]:
+        """Fallback selection with balanced document coverage."""
+        doc_id_set = set()
+        for doc in docs:
+            did = doc.get("metadata", {}).get("doc_id")
+            if did:
+                doc_id_set.add(did)
+
+        if len(doc_id_set) <= 1:
+            return docs[:top_k]
+
+        min_per_doc = max(1, top_k // len(doc_id_set))
+        result = []
+        doc_counts: Dict[str, int] = {did: 0 for did in doc_id_set}
+
+        for doc in docs:
+            did = doc.get("metadata", {}).get("doc_id", "")
+            if did in doc_counts and doc_counts[did] < min_per_doc:
+                result.append(doc)
+                doc_counts[did] += 1
+
+        result_ids = {id(d) for d in result}
+        for doc in docs:
+            if len(result) >= top_k:
+                break
+            if id(doc) not in result_ids:
+                result.append(doc)
+
+        return result[:top_k]

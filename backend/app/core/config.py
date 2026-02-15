@@ -19,10 +19,10 @@ class Settings(BaseSettings):
     PINECONE_ENVIRONMENT: str = "gcp-starter"
     PINECONE_INDEX_NAME: str = "docgraph-multimodal"
 
-    # Neo4j
-    NEO4J_URI: str = "bolt://localhost:7687"
+    # Neo4j (Aura Cloud)
+    NEO4J_URI: str = "neo4j+ssc://cd1238c4.databases.neo4j.io"
     NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "password123"
+    NEO4J_PASSWORD: str = "G_5gA7-z_Vj_0WyQlgtuc1k5Hhrk8w753VfnzQ5FaSM"
 
     # OpenAI
     OPENAI_API_KEY: str
@@ -52,10 +52,10 @@ class Settings(BaseSettings):
     CHILD_CHUNK_OVERLAP: int = 50
 
     # Retrieval Settings
-    SEMANTIC_TOP_K: int = 10
+    SEMANTIC_TOP_K: int = 20
     GRAPH_MAX_DEPTH: int = 2
     BM25_TOP_K: int = 5
-    RERANK_TOP_K: int = 5
+    RERANK_TOP_K: int = 10
 
     # Judge (LLM-as-a-Judge reflection layer)
     JUDGE_ENABLED: bool = True

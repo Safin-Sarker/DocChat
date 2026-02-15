@@ -1,4 +1,4 @@
-import { useRAGQuery } from '@/hooks/useQuery';
+import { useRAGQueryStream } from '@/hooks/useQuery';
 import { useChatStore } from '@/stores/chatStore';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
@@ -9,14 +9,18 @@ export function ChatContainer() {
     messages,
     addMessage,
     setLoading,
-    currentDocId,
+    selectedDocIds,
+    selectAllDocs,
     setEntities,
     isLoading,
+    uploadedDocuments,
   } = useChatStore();
-  const { mutate: queryRAG, isPending } = useRAGQuery();
+  const { streamQuery } = useRAGQueryStream();
 
-  const handleSubmit = (userMessage: string) => {
-    if (!currentDocId) return;
+  const hasDocsSelected = selectedDocIds.length > 0;
+
+  const handleSubmit = async (userMessage: string) => {
+    if (!hasDocsSelected) return;
 
     // Add user message
     addMessage({
@@ -38,45 +42,12 @@ export function ChatContainer() {
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    // Query RAG
-    queryRAG(
-      { query: userMessage, chat_history: recentHistory },
-      {
-        onSuccess: (response) => {
-          useChatStore.setState((state) => {
-            const newMessages = [...state.messages];
-            if (newMessages.length > 0) {
-              newMessages[newMessages.length - 1] = {
-                ...newMessages[newMessages.length - 1],
-                content: response.answer,
-                sources: response.sources,
-                contexts: response.contexts,
-                reflection: response.reflection,
-              };
-            }
-            return { messages: newMessages };
-          });
-
-          if (response.entities && response.entities.length > 0) {
-            setEntities(response.entities);
-          }
-          setLoading(false);
-        },
-        onError: () => {
-          useChatStore.setState((state) => {
-            const newMessages = [...state.messages];
-            if (newMessages.length > 0) {
-              newMessages[newMessages.length - 1] = {
-                ...newMessages[newMessages.length - 1],
-                content: 'Sorry, I encountered an error processing your query. Please try again.',
-              };
-            }
-            return { messages: newMessages };
-          });
-          setLoading(false);
-        },
-      }
-    );
+    // Stream query — send empty doc_ids when all docs selected to search everything
+    await streamQuery({
+      query: userMessage,
+      chat_history: recentHistory,
+      doc_ids: selectAllDocs ? undefined : selectedDocIds,
+    });
   };
 
   const handleRegenerate = (messageId: string) => {
@@ -100,12 +71,12 @@ export function ChatContainer() {
   if (messages.length === 0) {
     return (
       <div className="flex flex-col h-full">
-        <WelcomeScreen hasDocument={!!currentDocId} />
-        {currentDocId && (
+        <WelcomeScreen hasDocument={hasDocsSelected} />
+        {hasDocsSelected && (
           <ChatInput
             onSubmit={handleSubmit}
-            disabled={!currentDocId}
-            isLoading={isPending || isLoading}
+            disabled={!hasDocsSelected}
+            isLoading={isLoading}
           />
         )}
       </div>
@@ -116,13 +87,13 @@ export function ChatContainer() {
     <div className="flex flex-col h-full">
       <ChatMessages
         messages={messages}
-        isLoading={isPending || isLoading}
+        isLoading={isLoading}
         onRegenerate={handleRegenerate}
       />
       <ChatInput
         onSubmit={handleSubmit}
-        disabled={!currentDocId}
-        isLoading={isPending || isLoading}
+        disabled={!hasDocsSelected}
+        isLoading={isLoading}
       />
     </div>
   );

@@ -131,7 +131,8 @@ class GraphStore:
         seed_entities: List[str],
         max_depth: int = 2,
         limit: int = 50,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        doc_ids: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """Query related entities using graph traversal.
 
@@ -140,6 +141,7 @@ class GraphStore:
             max_depth: Maximum traversal depth
             limit: Maximum number of results
             user_id: User ID for multi-tenant isolation
+            doc_ids: List of document IDs to filter by (empty/None = all documents)
         """
         if not seed_entities:
             return []
@@ -147,22 +149,31 @@ class GraphStore:
         # Normalize seeds to uppercase for case-insensitive matching
         normalized_seeds = [s.upper() for s in seed_entities]
 
+        # Build doc_ids filter clause
+        doc_filter_seed = ""
+        doc_filter_related = ""
+        if doc_ids:
+            doc_filter_seed = " AND ANY(d IN seed.doc_ids WHERE d IN $doc_ids)"
+            doc_filter_related = " AND ANY(d IN related.doc_ids WHERE d IN $doc_ids)"
+
         try:
             if user_id:
-                # Use native Cypher variable-length path instead of APOC
                 query = (
                     "MATCH (seed:Entity) "
-                    "WHERE toUpper(seed.name) IN $seeds AND seed.user_id = $user_id "
+                    "WHERE toUpper(seed.name) IN $seeds AND seed.user_id = $user_id" + doc_filter_seed + " "
                     "OPTIONAL MATCH (seed)-[*1.." + str(max_depth) + "]-(related:Entity) "
-                    "WHERE related.user_id = $user_id "
+                    "WHERE related.user_id = $user_id" + doc_filter_related + " "
                     "WITH COLLECT(DISTINCT seed) + COLLECT(DISTINCT related) AS allNodes "
                     "UNWIND allNodes AS n "
                     "WITH n WHERE n IS NOT NULL "
                     "RETURN DISTINCT id(n) AS id, n.name AS name, labels(n)[0] AS type "
                     "LIMIT $limit"
                 )
+                params = {"seeds": normalized_seeds, "limit": limit, "user_id": user_id}
+                if doc_ids:
+                    params["doc_ids"] = doc_ids
                 with self.driver.session() as session:
-                    result = session.run(query, seeds=normalized_seeds, limit=limit, user_id=user_id)
+                    result = session.run(query, **params)
                     return [
                         {
                             "id": str(record["id"]),
@@ -174,16 +185,20 @@ class GraphStore:
                     ]
             else:
                 query = (
-                    "MATCH (seed:Entity) WHERE toUpper(seed.name) IN $seeds "
+                    "MATCH (seed:Entity) WHERE toUpper(seed.name) IN $seeds" + doc_filter_seed + " "
                     "OPTIONAL MATCH (seed)-[*1.." + str(max_depth) + "]-(related:Entity) "
+                    + ("WHERE " + doc_filter_related.lstrip(" AND ") + " " if doc_filter_related else "") +
                     "WITH COLLECT(DISTINCT seed) + COLLECT(DISTINCT related) AS allNodes "
                     "UNWIND allNodes AS n "
                     "WITH n WHERE n IS NOT NULL "
                     "RETURN DISTINCT id(n) AS id, n.name AS name, labels(n)[0] AS type "
                     "LIMIT $limit"
                 )
+                params = {"seeds": normalized_seeds, "limit": limit}
+                if doc_ids:
+                    params["doc_ids"] = doc_ids
                 with self.driver.session() as session:
-                    result = session.run(query, seeds=normalized_seeds, limit=limit)
+                    result = session.run(query, **params)
                     return [
                         {
                             "id": str(record["id"]),

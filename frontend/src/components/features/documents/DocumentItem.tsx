@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, FileImage, File, Trash2, Loader2 } from 'lucide-react';
+import { FileText, FileImage, File, Trash2, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -11,8 +11,8 @@ import type { UploadedDocument } from '@/types/api';
 
 interface DocumentItemProps {
   document: UploadedDocument;
-  isActive: boolean;
-  onSelect: () => void;
+  isSelected: boolean;
+  onToggle: () => void;
   onDelete: () => Promise<void>;
 }
 
@@ -31,7 +31,7 @@ function getFileIcon(filename: string) {
   }
 }
 
-function truncateFilename(filename: string, maxLength: number = 24) {
+function truncateFilename(filename: string, maxLength: number = 20) {
   if (filename.length <= maxLength) return filename;
   const ext = filename.split('.').pop() || '';
   const name = filename.slice(0, filename.lastIndexOf('.'));
@@ -49,8 +49,8 @@ function formatDate(dateString: string) {
 
 export function DocumentItem({
   document,
-  isActive,
-  onSelect,
+  isSelected,
+  onToggle,
   onDelete,
 }: DocumentItemProps) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -70,24 +70,37 @@ export function DocumentItem({
     <div
       className={cn(
         'group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors',
-        isActive
+        isSelected
           ? 'bg-primary/10 text-primary'
           : 'hover:bg-accent text-foreground'
       )}
-      onClick={onSelect}
-      role="button"
+      onClick={onToggle}
+      role="checkbox"
+      aria-checked={isSelected}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onSelect();
+          onToggle();
         }
       }}
     >
+      {/* Checkbox indicator */}
+      <div
+        className={cn(
+          'flex-shrink-0 w-4 h-4 rounded border transition-colors flex items-center justify-center',
+          isSelected
+            ? 'bg-primary border-primary'
+            : 'border-muted-foreground/40'
+        )}
+      >
+        {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+      </div>
+
       <Icon
         className={cn(
           'h-4 w-4 flex-shrink-0',
-          isActive ? 'text-primary' : 'text-muted-foreground'
+          isSelected ? 'text-primary' : 'text-muted-foreground'
         )}
       />
 
@@ -111,8 +124,8 @@ export function DocumentItem({
         variant="ghost"
         size="icon"
         className={cn(
-          'h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity',
-          isDeleting && 'opacity-100'
+          'h-7 w-7 min-w-[28px] flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors',
+          isDeleting && 'text-destructive'
         )}
         disabled={isDeleting}
         onClick={handleDelete}
@@ -121,7 +134,7 @@ export function DocumentItem({
         {isDeleting ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive transition-colors" />
+          <Trash2 className="h-3.5 w-3.5" />
         )}
       </Button>
     </div>
