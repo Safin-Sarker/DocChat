@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -6,14 +7,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 
 export function LoginForm() {
   const { setAuth } = useAuthStore();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('login');
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get('tab') === 'register' ? 'register' : 'login'
+  );
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -35,6 +40,7 @@ export function LoginForm() {
     try {
       const response = await api.login({ email: loginEmail, password: loginPassword });
       setAuth(response.access_token, response.user);
+      navigate('/app');
     } catch (err: any) {
       setError(err.detail || 'Login failed. Please check your credentials.');
     } finally {
@@ -65,6 +71,7 @@ export function LoginForm() {
         password: registerPassword,
       });
       setAuth(response.access_token, response.user);
+      navigate('/app');
     } catch (err: any) {
       setError(err.detail || 'Registration failed. Email or username may already exist.');
     } finally {
@@ -76,6 +83,15 @@ export function LoginForm() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-[400px] shadow-lg">
         <CardHeader className="text-center pb-2">
+          <div className="flex justify-start mb-2">
+            <Link
+              to="/"
+              className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to home
+            </Link>
+          </div>
           <div className="flex justify-center mb-4">
             <Logo size="lg" showText={false} />
           </div>

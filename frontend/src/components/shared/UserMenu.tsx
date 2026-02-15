@@ -1,4 +1,5 @@
 import { LogOut, Moon, Sun } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { useTheme } from '@/hooks/useTheme';
 export function UserMenu() {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   const initials = user?.username
     ? user.username.slice(0, 2).toUpperCase()
@@ -22,7 +24,7 @@ export function UserMenu() {
 
   const handleLogout = () => {
     logout();
-    window.location.reload();
+    navigate('/');
   };
 
   return (
