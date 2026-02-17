@@ -11,7 +11,6 @@ export function ChatContainer() {
     setLoading,
     selectedDocIds,
     selectAllDocs,
-    setEntities,
     isLoading,
     uploadedDocuments,
   } = useChatStore();
@@ -43,10 +42,14 @@ export function ChatContainer() {
       .map((m) => ({ role: m.role, content: m.content }));
 
     // Stream query — send empty doc_ids when all docs selected to search everything
+    const effectiveDocIds = selectAllDocs
+      ? uploadedDocuments.map((doc) => doc.doc_id)
+      : selectedDocIds;
+
     await streamQuery({
       query: userMessage,
       chat_history: recentHistory,
-      doc_ids: selectAllDocs ? undefined : selectedDocIds,
+      doc_ids: effectiveDocIds.length > 0 ? effectiveDocIds : undefined,
     });
   };
 

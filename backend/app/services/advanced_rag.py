@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 from typing import Dict, Any, List, Optional, AsyncIterator, Tuple
 from app.core.config import settings
 
@@ -48,6 +49,168 @@ class AdvancedRAGService:
             logger.warning(f"Failed to build doc_names map: {exc}")
             return {}
 
+    @staticmethod
+    def _diversify_by_doc(
+        ranked: List[Dict[str, Any]],
+        top_k: int,
+        doc_ids: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """Keep reranked results balanced across selected documents."""
+        if not ranked:
+            return []
+
+        if not doc_ids or len(doc_ids) <= 1:
+            return ranked[:top_k]
+
+        selected: List[Dict[str, Any]] = []
+        selected_ids = set()
+        per_doc_count: Dict[str, int] = {}
+        per_doc_cap = max(2, math.ceil(top_k / len(doc_ids)) + 1)
+
+        # First pass: try to include at least one chunk from each selected doc
+        for doc_id in doc_ids:
+            for item in ranked:
+                item_id = item.get("id")
+                item_doc_id = item.get("metadata", {}).get("doc_id")
+                if item_id in selected_ids or item_doc_id != doc_id:
+                    continue
+                selected.append(item)
+                selected_ids.add(item_id)
+                per_doc_count[doc_id] = per_doc_count.get(doc_id, 0) + 1
+                break
+
+        # Second pass: fill remaining slots while capping per-doc dominance
+        for item in ranked:
+            if len(selected) >= top_k:
+                break
+            item_id = item.get("id")
+            item_doc_id = item.get("metadata", {}).get("doc_id")
+            if item_id in selected_ids:
+                continue
+            if item_doc_id and per_doc_count.get(item_doc_id, 0) >= per_doc_cap:
+                continue
+
+            selected.append(item)
+            selected_ids.add(item_id)
+            if item_doc_id:
+                per_doc_count[item_doc_id] = per_doc_count.get(item_doc_id, 0) + 1
+
+        return selected[:top_k]
+
+    @staticmethod
+    def _looks_like_multi_doc_summary(query: str) -> bool:
+        """Heuristic for broad multi-document summary requests."""
+        q = (query or "").lower()
+        return any(token in q for token in ["these documents", "all documents", "documents", "all docs", "docs"])
+
+    @staticmethod
+    def _ensure_doc_coverage(
+        ranked: List[Dict[str, Any]],
+        candidates: List[Dict[str, Any]],
+        doc_ids: Optional[List[str]],
+        top_k: int,
+    ) -> List[Dict[str, Any]]:
+        """Ensure at least one chunk per selected document when possible."""
+        if not doc_ids or len(doc_ids) <= 1:
+            return ranked[:top_k]
+
+        selected = list(ranked[:top_k])
+        selected_ids = {item.get("id") for item in selected}
+        covered_doc_ids = {
+            item.get("metadata", {}).get("doc_id")
+            for item in selected
+            if item.get("metadata", {}).get("doc_id")
+        }
+
+        for doc_id in doc_ids:
+            if doc_id in covered_doc_ids:
+                continue
+            replacement = next(
+                (
+                    item for item in candidates
+                    if item.get("metadata", {}).get("doc_id") == doc_id
+                    and item.get("id") not in selected_ids
+                ),
+                None
+            )
+            if not replacement:
+                continue
+
+            if len(selected) >= top_k and selected:
+                selected.pop()
+            if len(selected) < top_k:
+                selected.append(replacement)
+                selected_ids.add(replacement.get("id"))
+                covered_doc_ids.add(doc_id)
+
+        return selected[:top_k]
+
+    @staticmethod
+    def _resolve_summary_doc_ids(
+        query: str,
+        user_id: Optional[str],
+        doc_ids: Optional[List[str]],
+    ) -> Optional[List[str]]:
+        """Resolve effective doc_ids for summary-style multi-document queries."""
+        if doc_ids:
+            return doc_ids
+        if not user_id or not AdvancedRAGService._looks_like_multi_doc_summary(query):
+            return doc_ids
+
+        try:
+            docs = Document.get_by_user(user_id)
+            all_doc_ids = [d.get("doc_id") for d in docs if d.get("doc_id")]
+            return all_doc_ids or None
+        except Exception as exc:
+            logger.warning(f"Failed to resolve all doc_ids for summary: {exc}")
+            return doc_ids
+
+    @staticmethod
+    def _limit_chunks_per_doc(
+        docs: List[Dict[str, Any]],
+        max_per_doc: int,
+        top_k: int
+    ) -> List[Dict[str, Any]]:
+        """Limit number of chunks per document to avoid one-doc overrepresentation."""
+        if max_per_doc <= 0:
+            return docs[:top_k]
+
+        counts: Dict[str, int] = {}
+        selected: List[Dict[str, Any]] = []
+        for doc in docs:
+            if len(selected) >= top_k:
+                break
+            doc_id = doc.get("metadata", {}).get("doc_id", "")
+            if doc_id:
+                if counts.get(doc_id, 0) >= max_per_doc:
+                    continue
+                counts[doc_id] = counts.get(doc_id, 0) + 1
+            selected.append(doc)
+        return selected
+
+    @staticmethod
+    def _build_summary_prompt(doc_ids: List[str], doc_names: Dict[str, str]) -> str:
+        """Build strict summary prompt with one section per unique document."""
+        if len(doc_ids) <= 1:
+            return (
+                "Provide a comprehensive summary and overview of this document. "
+                "Cover the main topics, purpose, and key points."
+            )
+
+        ordered_names = [doc_names.get(doc_id, doc_id) for doc_id in doc_ids]
+        bullet_list = "\n".join(f"- {name}" for name in ordered_names)
+        return (
+            "Summarize the uploaded documents using EXACTLY one section per unique filename.\n"
+            "Output requirements:\n"
+            f"- Create exactly {len(ordered_names)} sections, one for each filename below.\n"
+            "- Use this heading format exactly once per file: `### <filename>`.\n"
+            "- Do NOT split one document into multiple sections based on page numbers or excerpts.\n"
+            "- Each section should be 2-4 concise sentences.\n"
+            "- After all sections, add a short `### Connections` section with shared themes.\n\n"
+            "Filenames:\n"
+            f"{bullet_list}"
+        )
+
     async def answer(self, query: str, user_id: Optional[str] = None, chat_history: Optional[List] = None, doc_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         """Generate an answer with sources and entities.
 
@@ -73,7 +236,13 @@ class AdvancedRAGService:
 
         if intent == "summary":
             logger.info("Routed to summary pipeline")
-            return await self._generate_summary(query, user_id, chat_history=chat_history, doc_ids=doc_ids)
+            effective_doc_ids = self._resolve_summary_doc_ids(query, user_id, doc_ids)
+            return await self._generate_summary(
+                query,
+                user_id,
+                chat_history=chat_history,
+                doc_ids=effective_doc_ids
+            )
 
         # Document query - full RAG pipeline
         logger.info(f"Routed to RAG pipeline (intent: {intent})")
@@ -86,6 +255,7 @@ class AdvancedRAGService:
         logger.info(f"After filtering low-content: {len(candidates)} candidates")
 
         reranked = await self.reranker.rerank(query, candidates, settings.RERANK_TOP_K)
+        reranked = self._diversify_by_doc(reranked, settings.RERANK_TOP_K, doc_ids)
         logger.info(f"Reranked to {len(reranked)} results")
 
         doc_names = self._build_doc_names(user_id)
@@ -135,6 +305,10 @@ class AdvancedRAGService:
 
         # Use reranker for balanced multi-doc coverage
         top_candidates = await self.reranker.rerank(summary_query, candidates, settings.RERANK_TOP_K)
+        top_candidates = self._diversify_by_doc(top_candidates, settings.RERANK_TOP_K, doc_ids)
+        top_candidates = self._ensure_doc_coverage(top_candidates, candidates, doc_ids, settings.RERANK_TOP_K)
+        if doc_ids and len(doc_ids) > 1:
+            top_candidates = self._limit_chunks_per_doc(top_candidates, max_per_doc=2, top_k=settings.RERANK_TOP_K)
         logger.info(f"Summary: using {len(top_candidates)} chunks after reranking")
 
         if not top_candidates:
@@ -150,24 +324,12 @@ class AdvancedRAGService:
         contexts = self.assembler.assemble(top_candidates, doc_names=doc_names)
         logger.info(f"Summary: assembled {len(contexts)} contexts")
 
-        # Detect if multi-doc or single-doc for prompt
-        doc_id_set = set()
+        covered_doc_ids: List[str] = []
         for c in top_candidates:
             did = c.get("metadata", {}).get("doc_id")
-            if did:
-                doc_id_set.add(did)
-
-        if len(doc_id_set) > 1:
-            summary_prompt = (
-                "Provide a comprehensive summary and overview of EACH of these documents. "
-                "Summarize each document separately with its own section, then highlight any connections between them. "
-                "Cover the main topics, purpose, and key points of each document."
-            )
-        else:
-            summary_prompt = (
-                "Provide a comprehensive summary and overview of this document. "
-                "Cover the main topics, purpose, and key points."
-            )
+            if did and did not in covered_doc_ids:
+                covered_doc_ids.append(did)
+        summary_prompt = self._build_summary_prompt(covered_doc_ids, doc_names)
         answer = self.generator.generate(summary_prompt, contexts, chat_history=chat_history)
         logger.info(f"Generated summary ({len(answer)} chars)")
 
@@ -212,7 +374,8 @@ class AdvancedRAGService:
             return
 
         if intent == "summary":
-            async for event in self._generate_summary_stream(query, user_id, chat_history, doc_ids):
+            effective_doc_ids = self._resolve_summary_doc_ids(query, user_id, doc_ids)
+            async for event in self._generate_summary_stream(query, user_id, chat_history, effective_doc_ids):
                 yield event
             return
 
@@ -224,6 +387,7 @@ class AdvancedRAGService:
         # 3. Rerank
         yield ("status", {"stage": "reranking"})
         reranked = await self.reranker.rerank(query, candidates, settings.RERANK_TOP_K)
+        reranked = self._diversify_by_doc(reranked, settings.RERANK_TOP_K, doc_ids)
 
         # 4. Assemble contexts with document labels
         doc_names = await asyncio.to_thread(self._build_doc_names, user_id)
@@ -281,6 +445,10 @@ class AdvancedRAGService:
         # Use reranker for balanced multi-doc coverage
         yield ("status", {"stage": "reranking"})
         top_candidates = await self.reranker.rerank(summary_query, candidates, settings.RERANK_TOP_K)
+        top_candidates = self._diversify_by_doc(top_candidates, settings.RERANK_TOP_K, doc_ids)
+        top_candidates = self._ensure_doc_coverage(top_candidates, candidates, doc_ids, settings.RERANK_TOP_K)
+        if doc_ids and len(doc_ids) > 1:
+            top_candidates = self._limit_chunks_per_doc(top_candidates, max_per_doc=2, top_k=settings.RERANK_TOP_K)
 
         if not top_candidates:
             yield ("token", {"content": "I couldn't find enough content to generate a summary. Try asking a specific question about the document."})
@@ -292,24 +460,12 @@ class AdvancedRAGService:
         sources = [doc.get("metadata", {}) for doc in top_candidates]
         yield ("sources", {"sources": sources, "contexts": contexts})
 
-        # Detect if multi-doc or single-doc for prompt
-        doc_id_set = set()
+        covered_doc_ids: List[str] = []
         for c in top_candidates:
             did = c.get("metadata", {}).get("doc_id")
-            if did:
-                doc_id_set.add(did)
-
-        if len(doc_id_set) > 1:
-            summary_prompt = (
-                "Provide a comprehensive summary and overview of EACH of these documents. "
-                "Summarize each document separately with its own section, then highlight any connections between them. "
-                "Cover the main topics, purpose, and key points of each document."
-            )
-        else:
-            summary_prompt = (
-                "Provide a comprehensive summary and overview of this document. "
-                "Cover the main topics, purpose, and key points."
-            )
+            if did and did not in covered_doc_ids:
+                covered_doc_ids.append(did)
+        summary_prompt = self._build_summary_prompt(covered_doc_ids, doc_names)
 
         yield ("status", {"stage": "generating"})
         full_answer = ""

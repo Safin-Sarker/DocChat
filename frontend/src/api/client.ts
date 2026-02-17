@@ -192,6 +192,17 @@ export const api = {
     );
     return response.data;
   },
+
+  // Fetch original uploaded document as a blob
+  getDocumentFile: async (docId: string): Promise<Blob> => {
+    const response = await apiClient.get(
+      `/api/v1/documents/${docId}/file`,
+      {
+        responseType: 'blob',
+      }
+    );
+    return response.data as Blob;
+  },
 };
 
 export default apiClient;

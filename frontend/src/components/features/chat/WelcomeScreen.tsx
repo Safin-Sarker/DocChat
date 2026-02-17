@@ -51,7 +51,7 @@ export function WelcomeScreen({ hasDocument, hasUploadedDocs = false }: WelcomeS
             </div>
             <h3 className="font-semibold text-sm mb-1">Multiple Formats</h3>
             <p className="text-xs text-muted-foreground">
-              Upload PDFs, DOCX files, or images
+              Upload PDFs, DOCX, XLSX files, or images
             </p>
           </div>
           <div className="p-4 rounded-xl bg-muted/30 border border-border/50 transition-all duration-200 hover:bg-muted/60 hover:shadow-sm">

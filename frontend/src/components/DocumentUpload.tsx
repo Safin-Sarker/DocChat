@@ -37,6 +37,7 @@ export const DocumentUpload = () => {
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
       'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
     },
     maxFiles: 1,
@@ -136,6 +137,9 @@ export const DocumentUpload = () => {
                     </Badge>
                     <Badge variant="outline" className="text-xs">
                       DOCX
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      XLSX
                     </Badge>
                     <Badge variant="outline" className="text-xs">
                       Images

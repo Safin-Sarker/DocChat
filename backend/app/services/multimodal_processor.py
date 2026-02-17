@@ -4,20 +4,24 @@ import logging
 from typing import Dict, Any, List, Optional
 import asyncio
 import uuid
+from pathlib import Path
 import pdfplumber
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 from app.services.chunking_service import ChunkingService
 from app.services.ocr_service import OCRService
 from app.services.image_extractor import ImageExtractor
 from app.services.table_extractor import TableExtractor
+from app.services.docx_extractor import DocxExtractor
+from app.services.excel_extractor import ExcelExtractor
 from app.services.graph_builder import GraphBuilder
 from app.services.storage_service import StorageService
 from app.models.pinecone_store import PineconeStore
 
 
 class MultimodalProcessor:
-    """Process PDFs into text, tables, and images for RAG indexing."""
+    """Process supported documents into indexable multimodal content."""
 
     def __init__(
         self,
@@ -26,6 +30,8 @@ class MultimodalProcessor:
         storage_service: Optional[StorageService] = None,
         image_extractor: Optional[ImageExtractor] = None,
         table_extractor: Optional[TableExtractor] = None,
+        docx_extractor: Optional[DocxExtractor] = None,
+        excel_extractor: Optional[ExcelExtractor] = None,
         ocr_service: Optional[OCRService] = None,
         graph_builder: Optional[GraphBuilder] = None,
     ):
@@ -34,6 +40,8 @@ class MultimodalProcessor:
         self.storage_service = storage_service or StorageService()
         self.image_extractor = image_extractor or ImageExtractor(self.storage_service)
         self.table_extractor = table_extractor or TableExtractor()
+        self.docx_extractor = docx_extractor or DocxExtractor()
+        self.excel_extractor = excel_extractor or ExcelExtractor()
         self.ocr_service = ocr_service or OCRService()
         self.graph_builder = graph_builder or GraphBuilder()
 
@@ -41,14 +49,16 @@ class MultimodalProcessor:
         self,
         file_path: str,
         filename: str,
+        file_type: Optional[str] = None,
         doc_id: Optional[str] = None,
         user_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Process a PDF document and index extracted content.
+        """Process a document and index extracted content.
 
         Args:
             file_path: Path to the file to process
             filename: Original filename
+            file_type: Optional normalized file type (pdf, docx, xlsx, image)
             doc_id: Optional document ID
             user_id: User ID for multi-tenant isolation
 
@@ -56,6 +66,10 @@ class MultimodalProcessor:
             Summary of processing results
         """
         document_id = doc_id or str(uuid.uuid4())
+        normalized_file_type = (file_type or self._detect_file_type(filename)).lower()
+        if normalized_file_type not in {"pdf", "docx", "xlsx", "image"}:
+            raise ValueError(f"Unsupported file type: {normalized_file_type}")
+
         logger.info(f"[{document_id}] Uploading file to storage...")
         storage_path = await self.storage_service.upload_file(
             file_path=file_path,
@@ -64,15 +78,136 @@ class MultimodalProcessor:
             user_id=user_id
         )
 
-        # Run blocking PDF operations in a thread to avoid blocking the event loop
-        logger.info(f"[{document_id}] Extracting text from pages...")
+        if normalized_file_type == "pdf":
+            return await self._process_pdf(document_id, file_path, storage_path, user_id=user_id)
+        if normalized_file_type == "docx":
+            return await self._process_docx(document_id, file_path, storage_path, user_id=user_id)
+        if normalized_file_type == "xlsx":
+            return await self._process_xlsx(document_id, file_path, storage_path, user_id=user_id)
+        return await self._process_image(document_id, file_path, storage_path, user_id=user_id)
+
+    async def _process_pdf(
+        self,
+        document_id: str,
+        file_path: str,
+        storage_path: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        logger.info(f"[{document_id}] Extracting PDF text from pages...")
         pages = await asyncio.to_thread(self._extract_text_pages, file_path)
-        logger.info(f"[{document_id}] Extracted {len(pages)} pages, chunking...")
+        chunking_stats = await self._chunk_index_and_graph(pages, document_id, user_id=user_id)
+
+        logger.info(f"[{document_id}] Extracting PDF tables...")
+        table_entries = await asyncio.to_thread(self.table_extractor.extract_tables, file_path)
+        table_upserted = await self._index_tables(table_entries, document_id, user_id=user_id)
+
+        logger.info(f"[{document_id}] Extracting PDF page images...")
+        images = await self.image_extractor.extract_page_images(file_path, document_id, user_id=user_id)
+
+        return {
+            "doc_id": document_id,
+            "storage_path": storage_path,
+            "pages": len(pages),
+            "parent_chunks": chunking_stats["parent_chunks"],
+            "child_chunks": chunking_stats["child_chunks"],
+            "table_chunks": table_upserted,
+            "images": len(images),
+            "upserted_vectors": chunking_stats["text_upserted"] + table_upserted,
+        }
+
+    async def _process_docx(
+        self,
+        document_id: str,
+        file_path: str,
+        storage_path: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        logger.info(f"[{document_id}] Extracting DOCX text...")
+        pages = await asyncio.to_thread(self.docx_extractor.extract_pages, file_path)
+        chunking_stats = await self._chunk_index_and_graph(pages, document_id, user_id=user_id)
+
+        logger.info(f"[{document_id}] Extracting DOCX tables...")
+        table_entries = await asyncio.to_thread(self.docx_extractor.extract_tables, file_path)
+        table_upserted = await self._index_tables(table_entries, document_id, user_id=user_id)
+
+        return {
+            "doc_id": document_id,
+            "storage_path": storage_path,
+            "pages": len(pages),
+            "parent_chunks": chunking_stats["parent_chunks"],
+            "child_chunks": chunking_stats["child_chunks"],
+            "table_chunks": table_upserted,
+            "images": 0,
+            "upserted_vectors": chunking_stats["text_upserted"] + table_upserted,
+        }
+
+    async def _process_xlsx(
+        self,
+        document_id: str,
+        file_path: str,
+        storage_path: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        logger.info(f"[{document_id}] Extracting XLSX sheet content...")
+        pages = await asyncio.to_thread(self.excel_extractor.extract_sheets, file_path)
+        chunking_stats = await self._chunk_index_and_graph(pages, document_id, user_id=user_id)
+
+        logger.info(f"[{document_id}] Extracting XLSX table representations...")
+        table_entries = await asyncio.to_thread(self.excel_extractor.extract_tables, file_path)
+        table_upserted = await self._index_tables(table_entries, document_id, user_id=user_id)
+
+        return {
+            "doc_id": document_id,
+            "storage_path": storage_path,
+            "pages": len(pages),
+            "parent_chunks": chunking_stats["parent_chunks"],
+            "child_chunks": chunking_stats["child_chunks"],
+            "table_chunks": table_upserted,
+            "images": 0,
+            "upserted_vectors": chunking_stats["text_upserted"] + table_upserted,
+        }
+
+    async def _process_image(
+        self,
+        document_id: str,
+        file_path: str,
+        storage_path: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        logger.info(f"[{document_id}] Running OCR for image...")
+        ocr_text = await asyncio.to_thread(self._extract_image_text, file_path)
+        pages = [{"page_num": 1, "text": ocr_text}] if ocr_text.strip() else []
+        chunking_stats = await self._chunk_index_and_graph(pages, document_id, user_id=user_id)
+
+        image_entries = await self._upload_original_image(file_path, document_id, user_id=user_id)
+
+        return {
+            "doc_id": document_id,
+            "storage_path": storage_path,
+            "pages": 1,
+            "parent_chunks": chunking_stats["parent_chunks"],
+            "child_chunks": chunking_stats["child_chunks"],
+            "table_chunks": 0,
+            "images": len(image_entries),
+            "upserted_vectors": chunking_stats["text_upserted"],
+        }
+
+    async def _chunk_index_and_graph(
+        self,
+        pages: List[Dict[str, Any]],
+        document_id: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, int]:
+        """Create chunks, index text vectors, and optionally build graph."""
+        if not pages:
+            return {"parent_chunks": 0, "child_chunks": 0, "text_upserted": 0}
 
         parent_chunks, child_chunks = await asyncio.to_thread(
             self.chunking_service.process_document_pages, pages
         )
-        logger.info(f"[{document_id}] Created {len(parent_chunks)} parent, {len(child_chunks)} child chunks")
+        logger.info(
+            f"[{document_id}] Created {len(parent_chunks)} parent and {len(child_chunks)} child chunks"
+        )
 
         if parent_chunks:
             try:
@@ -83,7 +218,6 @@ class MultimodalProcessor:
                     document_id,
                     user_id
                 )
-                logger.info(f"[{document_id}] Graph build complete")
             except Exception as exc:
                 logger.warning(f"[{document_id}] Graph build failed: {exc}")
             finally:
@@ -95,30 +229,68 @@ class MultimodalProcessor:
             doc_id=document_id,
             user_id=user_id
         )
-
-        logger.info(f"[{document_id}] Indexing {len(pinecone_payload['child_data'])} text chunks to Pinecone...")
         upserted = await self._index_text_chunks(pinecone_payload["child_data"], user_id=user_id)
         logger.info(f"[{document_id}] Upserted {upserted} text vectors")
 
-        logger.info(f"[{document_id}] Extracting tables...")
-        table_entries = await asyncio.to_thread(self.table_extractor.extract_tables, file_path)
-        table_upserted = await self._index_tables(table_entries, document_id, user_id=user_id)
-        logger.info(f"[{document_id}] Upserted {table_upserted} table vectors")
-
-        logger.info(f"[{document_id}] Extracting page images...")
-        images = await self.image_extractor.extract_page_images(file_path, document_id, user_id=user_id)
-        logger.info(f"[{document_id}] Extracted {len(images)} images")
-
         return {
-            "doc_id": document_id,
-            "storage_path": storage_path,
-            "pages": len(pages),
             "parent_chunks": len(parent_chunks),
             "child_chunks": len(child_chunks),
-            "table_chunks": table_upserted,
-            "images": len(images),
-            "upserted_vectors": upserted + table_upserted,
+            "text_upserted": upserted,
         }
+
+    def _extract_image_text(self, file_path: str) -> str:
+        """Extract OCR text from an image file."""
+        try:
+            with Image.open(file_path) as image:
+                return self.ocr_service.extract_text_from_image(image.convert("RGB"))
+        except Exception as exc:
+            print(f"Image OCR failed: {exc}")
+            return ""
+
+    async def _upload_original_image(
+        self,
+        file_path: str,
+        doc_id: str,
+        user_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Upload original image and return image metadata entry."""
+        extension = Path(file_path).suffix.lower().replace(".", "") or "png"
+        image_id = str(uuid.uuid4())
+        try:
+            with open(file_path, "rb") as image_file:
+                image_data = image_file.read()
+            with Image.open(file_path) as image:
+                width, height = image.size
+            image_url = await self.storage_service.upload_image(
+                image_data=image_data,
+                doc_id=doc_id,
+                image_id=image_id,
+                extension=extension,
+                user_id=user_id
+            )
+            return [{
+                "page": 1,
+                "image_id": image_id,
+                "url": image_url,
+                "width": width,
+                "height": height,
+            }]
+        except Exception as exc:
+            print(f"Image upload failed: {exc}")
+            return []
+
+    def _detect_file_type(self, filename: str) -> str:
+        """Detect file type from extension as a fallback."""
+        extension = Path(filename).suffix.lower()
+        if extension == ".pdf":
+            return "pdf"
+        if extension == ".docx":
+            return "docx"
+        if extension == ".xlsx":
+            return "xlsx"
+        if extension in {".png", ".jpg", ".jpeg", ".gif"}:
+            return "image"
+        return ""
 
     def _extract_text_pages(self, file_path: str) -> List[Dict[str, Any]]:
         """Extract text from each PDF page with OCR fallback."""
@@ -198,6 +370,10 @@ class MultimodalProcessor:
                 "text": table["markdown"],
                 "table_index": table["table_index"],
             }
+            for key, value in table.items():
+                if key in {"markdown", "raw", "page", "table_index"}:
+                    continue
+                metadata[key] = value
             if user_id:
                 metadata["user_id"] = user_id
             vectors.append({

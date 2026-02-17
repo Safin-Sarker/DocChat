@@ -19,7 +19,7 @@ const features = [
     icon: FileText,
     title: 'Multi-Format Support',
     description:
-      'Upload PDFs, Word documents, text files, and more. DocChat processes them all seamlessly.',
+      'Upload PDFs, Word documents, Excel files, and images. DocChat processes them seamlessly.',
   },
   {
     icon: MessageSquare,
@@ -46,7 +46,7 @@ const steps = [
     icon: Upload,
     number: 1,
     title: 'Upload',
-    description: 'Drop your documents into DocChat — PDFs, DOCX, TXT, and more.',
+    description: 'Drop your documents into DocChat - PDFs, DOCX, XLSX, and images.',
   },
   {
     icon: HelpCircle,

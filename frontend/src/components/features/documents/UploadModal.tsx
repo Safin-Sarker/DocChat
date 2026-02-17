@@ -112,6 +112,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
       'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
     },
     maxFiles: 1,
@@ -130,7 +131,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>
-            Upload a PDF, DOCX, or image file to start chatting
+            Upload a PDF, DOCX, XLSX, or image file to start chatting
           </DialogDescription>
         </DialogHeader>
 
@@ -203,6 +204,10 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
                   <Badge variant="secondary" className="text-xs">
                     <FileText className="mr-1 h-3 w-3" />
                     DOCX
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    <FileText className="mr-1 h-3 w-3" />
+                    XLSX
                   </Badge>
                   <Badge variant="secondary" className="text-xs">
                     Images

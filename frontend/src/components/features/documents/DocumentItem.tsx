@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, FileImage, File, Trash2, Loader2, Check } from 'lucide-react';
+import { FileText, FileImage, FileSpreadsheet, File, Trash2, Loader2, Check, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -13,6 +13,7 @@ interface DocumentItemProps {
   document: UploadedDocument;
   isSelected: boolean;
   onToggle: () => void;
+  onPreview: () => void;
   onDelete: () => Promise<void>;
 }
 
@@ -20,7 +21,11 @@ function getFileIcon(filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
     case 'pdf':
+    case 'docx':
       return FileText;
+    case 'xlsx':
+    case 'xls':
+      return FileSpreadsheet;
     case 'png':
     case 'jpg':
     case 'jpeg':
@@ -51,6 +56,7 @@ export function DocumentItem({
   document,
   isSelected,
   onToggle,
+  onPreview,
   onDelete,
 }: DocumentItemProps) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -69,7 +75,7 @@ export function DocumentItem({
   return (
     <div
       className={cn(
-        'group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors duration-200',
+        'group flex items-center gap-1.5 px-1.5 py-2 rounded-lg cursor-pointer transition-colors duration-200',
         isSelected
           ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
           : 'hover:bg-accent text-foreground'
@@ -120,23 +126,38 @@ export function DocumentItem({
         </p>
       </div>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className={cn(
-          'h-7 w-7 min-w-[28px] flex-shrink-0 text-muted-foreground hover:text-destructive transition-all duration-200',
-          isDeleting ? 'text-destructive opacity-100' : 'opacity-0 group-hover:opacity-100'
-        )}
-        disabled={isDeleting}
-        onClick={handleDelete}
-        aria-label="Delete document"
-      >
-        {isDeleting ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Trash2 className="h-3.5 w-3.5" />
-        )}
-      </Button>
+      <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 min-w-[24px] text-muted-foreground/80 hover:text-foreground transition-colors duration-200"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview();
+          }}
+          aria-label="Preview document"
+        >
+          <Eye className="h-3.5 w-3.5" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            'h-6 w-6 min-w-[24px] text-muted-foreground/80 hover:text-destructive transition-colors duration-200',
+            isDeleting ? 'text-destructive' : ''
+          )}
+          disabled={isDeleting}
+          onClick={handleDelete}
+          aria-label="Delete document"
+        >
+          {isDeleting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="h-3.5 w-3.5" />
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

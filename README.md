@@ -46,7 +46,7 @@
 
 ## Overview
 
-**DocChat Advanced RAG** is a sophisticated document intelligence platform that enables users to upload documents (PDFs, images, text files) and interact with them through natural language queries. The system leverages state-of-the-art AI technologies to provide accurate, context-aware responses while visualizing document relationships through an interactive knowledge graph.
+**DocChat Advanced RAG** is a sophisticated document intelligence platform that enables users to upload documents (PDF, DOCX, XLSX, and images) and interact with them through natural language queries. The system leverages state-of-the-art AI technologies to provide accurate, context-aware responses while visualizing document relationships through an interactive knowledge graph.
 
 ### Why DocChat?
 

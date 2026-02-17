@@ -163,7 +163,13 @@ export const useChatStore = create<ChatStore>()(
           currentDocId: state.currentDocId === docId ? null : state.currentDocId,
         })),
 
-      setUploadedDocuments: (docs) => set({ uploadedDocuments: docs }),
+      setUploadedDocuments: (docs) =>
+        set((state) => ({
+          uploadedDocuments: docs,
+          selectedDocIds: state.selectAllDocs
+            ? docs.map((d) => d.doc_id)
+            : state.selectedDocIds.filter((id) => docs.some((d) => d.doc_id === id)),
+        })),
     }),
     {
       name: 'docchat-storage',

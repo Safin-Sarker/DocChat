@@ -5,6 +5,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { api } from '@/api/client';
 import { DocumentItem } from './DocumentItem';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
+import { DocumentPreviewDialog } from './DocumentPreviewDialog';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,7 @@ interface DocumentListProps {
 
 export function DocumentList({ isLoading }: DocumentListProps) {
   const [deleteDoc, setDeleteDoc] = useState<UploadedDocument | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<UploadedDocument | null>(null);
   const {
     uploadedDocuments,
     selectedDocIds,
@@ -110,6 +112,7 @@ export function DocumentList({ isLoading }: DocumentListProps) {
             document={doc}
             isSelected={selectedDocIds.includes(doc.doc_id)}
             onToggle={() => toggleDocSelection(doc.doc_id)}
+            onPreview={() => setPreviewDoc(doc)}
             onDelete={async () => setDeleteDoc(doc)}
           />
         ))}
@@ -120,6 +123,12 @@ export function DocumentList({ isLoading }: DocumentListProps) {
         onOpenChange={(open) => !open && setDeleteDoc(null)}
         documentName={deleteDoc?.filename || ''}
         onConfirm={() => deleteDoc && handleDelete(deleteDoc)}
+      />
+
+      <DocumentPreviewDialog
+        open={!!previewDoc}
+        onOpenChange={(open) => !open && setPreviewDoc(null)}
+        document={previewDoc}
       />
     </>
   );
