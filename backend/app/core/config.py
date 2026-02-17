@@ -13,6 +13,13 @@ class Settings(BaseSettings):
 
     # Authentication
     SECRET_KEY: str = "change-this-secret-key-in-production-use-strong-random-string"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+
+    # OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    OAUTH_FRONTEND_URL: str = "http://localhost:5173"
+    OAUTH_BACKEND_URL: str = "http://localhost:8001"
 
     # Pinecone
     PINECONE_API_KEY: str
