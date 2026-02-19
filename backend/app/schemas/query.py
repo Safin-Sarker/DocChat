@@ -39,5 +39,6 @@ class QueryResponse(BaseModel):
     answer: str
     contexts: List[str]
     sources: List[Dict[str, Any]]
+    source_map: List[Dict[str, Any]] = []
     entities: List[str] = []
     reflection: Optional[ReflectionScore] = None

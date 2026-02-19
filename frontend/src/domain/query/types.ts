@@ -11,9 +11,17 @@ export interface SSETokenEvent {
   replace?: boolean;
 }
 
+export interface SourceMapEntry {
+  index: number;
+  doc_name: string;
+  page: number | string;
+  text: string;
+}
+
 export interface SSESourcesEvent {
   sources: Array<Record<string, any>>;
   contexts: string[];
+  source_map?: SourceMapEntry[];
 }
 
 export type CacheType = 'exact' | 'semantic' | 'none';
@@ -39,6 +47,7 @@ export interface QueryResponse {
   answer: string;
   contexts: string[];
   sources: Array<Record<string, any>>;
+  source_map?: SourceMapEntry[];
   entities: string[];
   reflection?: ReflectionScore | null;
 }

@@ -26,6 +26,8 @@ SUPPORTED_EXTENSIONS = {
     ".pdf": "pdf",
     ".docx": "docx",
     ".xlsx": "xlsx",
+    ".pptx": "pptx",
+    ".txt": "txt",
     ".png": "image",
     ".jpg": "image",
     ".jpeg": "image",
@@ -36,6 +38,8 @@ SUPPORTED_MIME_TYPES = {
     "application/pdf": "pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "text/plain": "txt",
     "image/png": "image",
     "image/jpeg": "image",
     "image/gif": "image",
@@ -74,7 +78,8 @@ async def upload_document(
             status_code=400,
             detail=(
                 "Unsupported file type. Supported formats: PDF (.pdf), Word (.docx), "
-                "Excel (.xlsx), and images (.png, .jpg, .jpeg, .gif)."
+                "Excel (.xlsx), PowerPoint (.pptx), Text (.txt), "
+                "and images (.png, .jpg, .jpeg, .gif)."
             ),
         )
 

@@ -15,6 +15,8 @@ from app.services.image_extractor import ImageExtractor
 from app.services.table_extractor import TableExtractor
 from app.services.docx_extractor import DocxExtractor
 from app.services.excel_extractor import ExcelExtractor
+from app.services.pptx_extractor import PptxExtractor
+from app.services.txt_extractor import TxtExtractor
 from app.services.graph_builder import GraphBuilder
 from app.services.storage_service import StorageService
 from app.models.pinecone_store import PineconeStore
@@ -32,6 +34,8 @@ class MultimodalProcessor:
         table_extractor: Optional[TableExtractor] = None,
         docx_extractor: Optional[DocxExtractor] = None,
         excel_extractor: Optional[ExcelExtractor] = None,
+        pptx_extractor: Optional[PptxExtractor] = None,
+        txt_extractor: Optional[TxtExtractor] = None,
         ocr_service: Optional[OCRService] = None,
         graph_builder: Optional[GraphBuilder] = None,
     ):
@@ -42,6 +46,8 @@ class MultimodalProcessor:
         self.table_extractor = table_extractor or TableExtractor()
         self.docx_extractor = docx_extractor or DocxExtractor()
         self.excel_extractor = excel_extractor or ExcelExtractor()
+        self.pptx_extractor = pptx_extractor or PptxExtractor()
+        self.txt_extractor = txt_extractor or TxtExtractor()
         self.ocr_service = ocr_service or OCRService()
         self.graph_builder = graph_builder or GraphBuilder()
 
@@ -67,7 +73,7 @@ class MultimodalProcessor:
         """
         document_id = doc_id or str(uuid.uuid4())
         normalized_file_type = (file_type or self._detect_file_type(filename)).lower()
-        if normalized_file_type not in {"pdf", "docx", "xlsx", "image"}:
+        if normalized_file_type not in {"pdf", "docx", "xlsx", "pptx", "txt", "image"}:
             raise ValueError(f"Unsupported file type: {normalized_file_type}")
 
         logger.info(f"[{document_id}] Uploading file to storage...")
@@ -84,6 +90,10 @@ class MultimodalProcessor:
             return await self._process_docx(document_id, file_path, storage_path, user_id=user_id)
         if normalized_file_type == "xlsx":
             return await self._process_xlsx(document_id, file_path, storage_path, user_id=user_id)
+        if normalized_file_type == "pptx":
+            return await self._process_pptx(document_id, file_path, storage_path, user_id=user_id)
+        if normalized_file_type == "txt":
+            return await self._process_txt(document_id, file_path, storage_path, user_id=user_id)
         return await self._process_image(document_id, file_path, storage_path, user_id=user_id)
 
     async def _process_pdf(
@@ -165,6 +175,54 @@ class MultimodalProcessor:
             "table_chunks": table_upserted,
             "images": 0,
             "upserted_vectors": chunking_stats["text_upserted"] + table_upserted,
+        }
+
+    async def _process_pptx(
+        self,
+        document_id: str,
+        file_path: str,
+        storage_path: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        logger.info(f"[{document_id}] Extracting PPTX slide text...")
+        pages = await asyncio.to_thread(self.pptx_extractor.extract_pages, file_path)
+        chunking_stats = await self._chunk_index_and_graph(pages, document_id, user_id=user_id)
+
+        logger.info(f"[{document_id}] Extracting PPTX tables...")
+        table_entries = await asyncio.to_thread(self.pptx_extractor.extract_tables, file_path)
+        table_upserted = await self._index_tables(table_entries, document_id, user_id=user_id)
+
+        return {
+            "doc_id": document_id,
+            "storage_path": storage_path,
+            "pages": len(pages),
+            "parent_chunks": chunking_stats["parent_chunks"],
+            "child_chunks": chunking_stats["child_chunks"],
+            "table_chunks": table_upserted,
+            "images": 0,
+            "upserted_vectors": chunking_stats["text_upserted"] + table_upserted,
+        }
+
+    async def _process_txt(
+        self,
+        document_id: str,
+        file_path: str,
+        storage_path: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        logger.info(f"[{document_id}] Extracting TXT content...")
+        pages = await asyncio.to_thread(self.txt_extractor.extract_pages, file_path)
+        chunking_stats = await self._chunk_index_and_graph(pages, document_id, user_id=user_id)
+
+        return {
+            "doc_id": document_id,
+            "storage_path": storage_path,
+            "pages": len(pages),
+            "parent_chunks": chunking_stats["parent_chunks"],
+            "child_chunks": chunking_stats["child_chunks"],
+            "table_chunks": 0,
+            "images": 0,
+            "upserted_vectors": chunking_stats["text_upserted"],
         }
 
     async def _process_image(
@@ -288,6 +346,10 @@ class MultimodalProcessor:
             return "docx"
         if extension == ".xlsx":
             return "xlsx"
+        if extension == ".pptx":
+            return "pptx"
+        if extension == ".txt":
+            return "txt"
         if extension in {".png", ".jpg", ".jpeg", ".gif"}:
             return "image"
         return ""

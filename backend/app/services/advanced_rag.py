@@ -484,7 +484,7 @@ class AdvancedRAGService:
         logger.info(f"Reranked to {len(reranked)} results")
 
         doc_names = self._build_doc_names(user_id)
-        contexts = self.assembler.assemble(reranked, doc_names=doc_names)
+        contexts, source_map = self.assembler.assemble_with_citations(reranked, doc_names=doc_names)
         logger.info(f"Assembled {len(contexts)} contexts")
 
         answer = self.generator.generate(query, contexts, chat_history=chat_history)
@@ -512,6 +512,7 @@ class AdvancedRAGService:
             "answer": answer,
             "contexts": contexts,
             "sources": [doc.get("metadata", {}) for doc in reranked],
+            "source_map": source_map,
             "entities": entities,
             "reflection": reflection,
         }
@@ -557,7 +558,7 @@ class AdvancedRAGService:
             }
 
         doc_names = self._build_doc_names(user_id)
-        contexts = self.assembler.assemble(top_candidates, doc_names=doc_names)
+        contexts, source_map = self.assembler.assemble_with_citations(top_candidates, doc_names=doc_names)
         logger.info(f"Summary: assembled {len(contexts)} contexts")
 
         covered_doc_ids: List[str] = []
@@ -589,6 +590,7 @@ class AdvancedRAGService:
             "answer": answer,
             "contexts": contexts,
             "sources": [doc.get("metadata", {}) for doc in top_candidates],
+            "source_map": source_map,
             "entities": entities,
             "reflection": reflection,
         }
@@ -609,6 +611,7 @@ class AdvancedRAGService:
                 yield ("sources", {
                     "sources": cached_response.get("sources", []),
                     "contexts": cached_response.get("contexts", []),
+                    "source_map": cached_response.get("source_map", []),
                 })
             yield ("status", {"stage": "generating"})
             yield ("token", {"content": cached_response.get("answer", "")})
@@ -654,6 +657,7 @@ class AdvancedRAGService:
                 yield ("sources", {
                     "sources": semantic_cached.get("sources", []),
                     "contexts": semantic_cached.get("contexts", []),
+                    "source_map": semantic_cached.get("source_map", []),
                 })
             yield ("status", {"stage": "generating"})
             yield ("token", {"content": semantic_cached.get("answer", "")})
@@ -679,11 +683,11 @@ class AdvancedRAGService:
 
         # 4. Assemble contexts with document labels
         doc_names = await asyncio.to_thread(self._build_doc_names, user_id)
-        contexts = self.assembler.assemble(reranked, doc_names=doc_names)
+        contexts, source_map = self.assembler.assemble_with_citations(reranked, doc_names=doc_names)
         sources = [doc.get("metadata", {}) for doc in reranked]
 
         # 5. Send sources before generation
-        yield ("sources", {"sources": sources, "contexts": contexts})
+        yield ("sources", {"sources": sources, "contexts": contexts, "source_map": source_map})
 
         # 6. Stream generation
         yield ("status", {"stage": "generating"})
@@ -725,6 +729,7 @@ class AdvancedRAGService:
             "answer": full_answer,
             "contexts": contexts,
             "sources": sources,
+            "source_map": source_map,
             "entities": entities,
             "reflection": reflection_payload,
         })
@@ -734,6 +739,7 @@ class AdvancedRAGService:
                 "answer": full_answer,
                 "contexts": contexts,
                 "sources": sources,
+                "source_map": source_map,
                 "entities": entities,
                 "reflection": reflection_payload,
             },
@@ -765,6 +771,7 @@ class AdvancedRAGService:
                 yield ("sources", {
                     "sources": semantic_cached.get("sources", []),
                     "contexts": semantic_cached.get("contexts", []),
+                    "source_map": semantic_cached.get("source_map", []),
                 })
             yield ("status", {"stage": "generating"})
             yield ("token", {"content": semantic_cached.get("answer", "")})
@@ -801,9 +808,9 @@ class AdvancedRAGService:
             return
 
         doc_names = await asyncio.to_thread(self._build_doc_names, user_id)
-        contexts = self.assembler.assemble(top_candidates, doc_names=doc_names)
+        contexts, source_map = self.assembler.assemble_with_citations(top_candidates, doc_names=doc_names)
         sources = [doc.get("metadata", {}) for doc in top_candidates]
-        yield ("sources", {"sources": sources, "contexts": contexts})
+        yield ("sources", {"sources": sources, "contexts": contexts, "source_map": source_map})
 
         covered_doc_ids: List[str] = []
         for c in top_candidates:
@@ -849,6 +856,7 @@ class AdvancedRAGService:
             "answer": full_answer,
             "contexts": contexts,
             "sources": sources,
+            "source_map": source_map,
             "entities": entities,
             "reflection": reflection_payload,
         })
@@ -858,6 +866,7 @@ class AdvancedRAGService:
                 "answer": full_answer,
                 "contexts": contexts,
                 "sources": sources,
+                "source_map": source_map,
                 "entities": entities,
                 "reflection": reflection_payload,
             },

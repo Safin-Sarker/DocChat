@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FileText, Check } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileText, Check, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppSelector, useAppDispatch } from '@/infrastructure/store/hooks';
 import { toggleDocSelection, setSelectAllDocs, removeUploadedDocument } from '@/infrastructure/store/slices/chatSlice';
@@ -19,10 +19,19 @@ interface DocumentListProps {
 export function DocumentList({ isLoading }: DocumentListProps) {
   const [deleteDoc, setDeleteDoc] = useState<UploadedDocument | null>(null);
   const [previewDoc, setPreviewDoc] = useState<UploadedDocument | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const dispatch = useAppDispatch();
   const uploadedDocuments = useAppSelector((s) => s.chat.uploadedDocuments);
   const selectedDocIds = useAppSelector((s) => s.chat.selectedDocIds);
   const selectAllDocsFlag = useAppSelector((s) => s.chat.selectAllDocs);
+
+  const filteredDocuments = useMemo(() => {
+    if (!searchQuery.trim()) return uploadedDocuments;
+    const query = searchQuery.toLowerCase();
+    return uploadedDocuments.filter((doc) =>
+      doc.filename.toLowerCase().includes(query)
+    );
+  }, [uploadedDocuments, searchQuery]);
 
   const handleDelete = async (doc: UploadedDocument) => {
     try {
@@ -71,8 +80,30 @@ export function DocumentList({ isLoading }: DocumentListProps) {
   return (
     <>
       <div className="space-y-1 p-1">
+        {/* Search input — only show when 3+ documents */}
+        {uploadedDocuments.length >= 3 && (
+          <div className="relative px-1 pb-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search documents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8 pr-8 text-sm bg-muted/50 border border-border/50 rounded-md placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* "All Documents" option */}
-        {uploadedDocuments.length > 1 && (
+        {uploadedDocuments.length > 1 && !searchQuery && (
           <div
             className={cn(
               'flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors',
@@ -103,16 +134,23 @@ export function DocumentList({ isLoading }: DocumentListProps) {
           </div>
         )}
 
-        {uploadedDocuments.map((doc) => (
-          <DocumentItem
-            key={doc.doc_id}
-            document={doc}
-            isSelected={selectedDocIds.includes(doc.doc_id)}
-            onToggle={() => dispatch(toggleDocSelection(doc.doc_id))}
-            onPreview={() => setPreviewDoc(doc)}
-            onDelete={async () => setDeleteDoc(doc)}
-          />
-        ))}
+        {filteredDocuments.length === 0 && searchQuery ? (
+          <div className="px-2 py-6 text-center">
+            <p className="text-sm text-muted-foreground">No matches found</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Try a different search term</p>
+          </div>
+        ) : (
+          filteredDocuments.map((doc) => (
+            <DocumentItem
+              key={doc.doc_id}
+              document={doc}
+              isSelected={selectedDocIds.includes(doc.doc_id)}
+              onToggle={() => dispatch(toggleDocSelection(doc.doc_id))}
+              onPreview={() => setPreviewDoc(doc)}
+              onDelete={async () => setDeleteDoc(doc)}
+            />
+          ))
+        )}
       </div>
 
       <DeleteConfirmDialog

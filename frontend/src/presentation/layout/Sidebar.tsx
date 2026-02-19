@@ -96,7 +96,8 @@ export function Sidebar({ isOpen, onClose, onToggleSidebar, onUploadClick }: Sid
             className="w-full justify-start gap-2 h-9 text-sm rounded-lg shadow-sm hover:shadow-md transition-shadow"
             onClick={() => {
               onUploadClick();
-              onClose();
+              // Only close sidebar on mobile where it overlays content
+              if (window.innerWidth < 1024) onClose();
             }}
           >
             <Upload className="h-4 w-4" />

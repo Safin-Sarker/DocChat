@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { Message } from '@/domain/chat/types';
 import type { UploadedDocument } from '@/domain/document/types';
-import type { ReflectionScore, SSEStage, SSECacheEvent } from '@/domain/query/types';
+import type { ReflectionScore, SSEStage, SSECacheEvent, SourceMapEntry } from '@/domain/query/types';
 
 interface ChatState {
   messages: Message[];
@@ -76,6 +76,7 @@ const chatSlice = createSlice({
       action: PayloadAction<{
         sources?: Array<Record<string, any>>;
         contexts?: string[];
+        source_map?: SourceMapEntry[];
         reflection?: ReflectionScore | null;
         cache?: SSECacheEvent;
       }>
@@ -84,6 +85,7 @@ const chatSlice = createSlice({
       if (last) {
         if (action.payload.sources !== undefined) last.sources = action.payload.sources;
         if (action.payload.contexts !== undefined) last.contexts = action.payload.contexts;
+        if (action.payload.source_map !== undefined) last.source_map = action.payload.source_map;
         if (action.payload.reflection !== undefined) last.reflection = action.payload.reflection;
         if (action.payload.cache !== undefined) last.cache = action.payload.cache;
       }

@@ -41,6 +41,10 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   const hasShownSuccessToast = useRef(false);
   const hasShownErrorToast = useRef(false);
 
+  // Stable ref for onOpenChange to avoid effect re-runs from inline callbacks
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+
   // Update uploading state
   useEffect(() => {
     dispatch(setUploading(isPending));
@@ -62,12 +66,11 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
       toast.success('Document uploaded successfully', {
         description: `${data.pages} pages processed`,
       });
-      const timer = setTimeout(() => {
-        onOpenChange(false);
+      setTimeout(() => {
+        onOpenChangeRef.current(false);
       }, 1500);
-      return () => clearTimeout(timer);
     }
-  }, [isSuccess, data, onOpenChange]);
+  }, [isSuccess, data]);
 
   // Show error toast
   useEffect(() => {
@@ -113,6 +116,8 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+      'text/plain': ['.txt'],
       'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
     },
     maxFiles: 1,
@@ -131,7 +136,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>
-            Upload a PDF, DOCX, XLSX, or image file to start chatting
+            Upload a PDF, DOCX, XLSX, PPTX, TXT, or image file to start chatting
           </DialogDescription>
         </DialogHeader>
 
@@ -196,7 +201,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
                 <p className="text-sm text-muted-foreground mb-4">
                   or click to browse
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <Badge variant="secondary" className="text-xs">
                     <FileText className="mr-1 h-3 w-3" />
                     PDF
@@ -208,6 +213,14 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
                   <Badge variant="secondary" className="text-xs">
                     <FileText className="mr-1 h-3 w-3" />
                     XLSX
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    <FileText className="mr-1 h-3 w-3" />
+                    PPTX
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    <FileText className="mr-1 h-3 w-3" />
+                    TXT
                   </Badge>
                   <Badge variant="secondary" className="text-xs">
                     Images

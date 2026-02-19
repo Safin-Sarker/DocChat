@@ -35,7 +35,7 @@ export const useRAGQueryStream = () => {
               }
               break;
             case 'sources':
-              store.dispatch(updateLastMessageMeta({ sources: data.sources, contexts: data.contexts }));
+              store.dispatch(updateLastMessageMeta({ sources: data.sources, contexts: data.contexts, source_map: data.source_map }));
               break;
             case 'reflection':
               store.dispatch(updateLastMessageMeta({ reflection: data }));

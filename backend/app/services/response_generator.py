@@ -40,7 +40,9 @@ class ResponseGenerator:
             "- If the context doesn't fully answer the question, share what you can "
             "from the context and suggest the user ask a more specific question.\n"
             "- Never say you have no information if context is provided — always try to extract something useful.\n"
-            "- Use the conversation history to understand follow-up questions and references like 'that', 'it', 'more', etc.\n\n"
+            "- Use the conversation history to understand follow-up questions and references like 'that', 'it', 'more', etc.\n"
+            "- Cite your sources using numbered references like [1], [2] that correspond to the context numbers provided.\n"
+            "- Place citations inline right after the relevant claim, e.g. 'The protocol requires 3 steps [1].'\n\n"
         )
         if feedback:
             prompt += (
