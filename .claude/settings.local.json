@@ -5,7 +5,9 @@
       "Bash(python:*)",
       "Bash(ls -la \"C:\\\\Users\\\\NOMSA9\\\\OneDrive - Laerdal Medical AS\\\\Desktop\\\\DocChat\\\\backend\\\\data\"\" 2>/dev/null || echo \"Directory not accessible yet \")",
       "Bash(tasklist:*)",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(xargs sed -i:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

@@ -1,8 +1,14 @@
 """End-to-end RAG pipeline service."""
 
 import asyncio
+import copy
+import hashlib
+import json
 import logging
 import math
+import time
+from collections import OrderedDict
+from threading import Lock
 from typing import Dict, Any, List, Optional, AsyncIterator, Tuple
 from app.core.config import settings
 
@@ -14,11 +20,15 @@ from app.services.response_generator import ResponseGenerator
 from app.services.entity_extractor import EntityExtractor
 from app.services.query_router import QueryRouter
 from app.services.answer_judge import AnswerJudge
+from app.services.cache_utils import TTLCache
 from app.models.document import Document
 
 
 class AdvancedRAGService:
     """Orchestrate retrieval, reranking, and response generation."""
+    _response_cache: Optional[TTLCache[str, Dict[str, Any]]] = None
+    _semantic_cache: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+    _semantic_cache_lock = Lock()
 
     def __init__(
         self,
@@ -36,6 +46,182 @@ class AdvancedRAGService:
         self.entity_extractor = entity_extractor or EntityExtractor()
         self.query_router = query_router or QueryRouter()
         self.answer_judge = AnswerJudge() if settings.JUDGE_ENABLED else None
+        if settings.ENABLE_QUERY_RESPONSE_CACHE and AdvancedRAGService._response_cache is None:
+            AdvancedRAGService._response_cache = TTLCache(
+                max_size=settings.QUERY_RESPONSE_CACHE_MAX_SIZE,
+                ttl_seconds=settings.QUERY_RESPONSE_CACHE_TTL_SECONDS,
+            )
+
+    @staticmethod
+    def _normalize_doc_ids(doc_ids: Optional[List[str]]) -> Optional[List[str]]:
+        if not doc_ids:
+            return None
+        normalized = sorted({doc_id for doc_id in doc_ids if doc_id})
+        return normalized or None
+
+    @staticmethod
+    def _normalize_chat_history(chat_history: Optional[List]) -> List[Dict[str, str]]:
+        normalized: List[Dict[str, str]] = []
+        for item in chat_history or []:
+            role = getattr(item, "role", None)
+            content = getattr(item, "content", None)
+            if role is None and isinstance(item, dict):
+                role = item.get("role")
+                content = item.get("content")
+            if role and isinstance(content, str):
+                normalized.append({"role": str(role), "content": content})
+        return normalized
+
+    @staticmethod
+    def _build_response_cache_key(
+        query: str,
+        user_id: Optional[str],
+        doc_ids: Optional[List[str]],
+        chat_history: Optional[List],
+    ) -> str:
+        payload = {
+            "v": 1,
+            "query": (query or "").strip(),
+            "user_id": user_id or "",
+            "doc_ids": AdvancedRAGService._normalize_doc_ids(doc_ids) or [],
+            "chat_history": AdvancedRAGService._normalize_chat_history(chat_history),
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+    def _get_cached_response(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        if not settings.ENABLE_QUERY_RESPONSE_CACHE or not AdvancedRAGService._response_cache:
+            return None
+        cached = AdvancedRAGService._response_cache.get(cache_key)
+        return copy.deepcopy(cached) if cached else None
+
+    def _set_cached_response(self, cache_key: str, response: Dict[str, Any]) -> None:
+        if not settings.ENABLE_QUERY_RESPONSE_CACHE or not AdvancedRAGService._response_cache:
+            return
+        AdvancedRAGService._response_cache.set(cache_key, copy.deepcopy(response))
+
+    @staticmethod
+    def _semantic_cache_scope(
+        user_id: Optional[str],
+        doc_ids: Optional[List[str]],
+        intent: str,
+    ) -> str:
+        normalized_docs = AdvancedRAGService._normalize_doc_ids(doc_ids) or []
+        return f"{user_id or ''}|{intent}|{','.join(normalized_docs)}"
+
+    @staticmethod
+    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+        if not a or not b or len(a) != len(b):
+            return 0.0
+        dot = sum(x * y for x, y in zip(a, b))
+        norm_a = math.sqrt(sum(x * x for x in a))
+        norm_b = math.sqrt(sum(y * y for y in b))
+        if norm_a == 0.0 or norm_b == 0.0:
+            return 0.0
+        return dot / (norm_a * norm_b)
+
+    @staticmethod
+    def _semantic_cache_allowed(chat_history: Optional[List]) -> bool:
+        if not settings.ENABLE_SEMANTIC_QUERY_CACHE:
+            return False
+        if not settings.SEMANTIC_CACHE_REQUIRE_EMPTY_HISTORY:
+            return True
+        normalized_history = AdvancedRAGService._normalize_chat_history(chat_history)
+        return len(normalized_history) == 0
+
+    @classmethod
+    def _prune_semantic_cache(cls) -> None:
+        now = time.time()
+        ttl = settings.QUERY_RESPONSE_CACHE_TTL_SECONDS
+        with cls._semantic_cache_lock:
+            expired_keys = [
+                key for key, item in cls._semantic_cache.items()
+                if item.get("expires_at", 0) <= now
+            ]
+            for key in expired_keys:
+                cls._semantic_cache.pop(key, None)
+
+            while len(cls._semantic_cache) > settings.QUERY_RESPONSE_CACHE_MAX_SIZE:
+                cls._semantic_cache.popitem(last=False)
+
+    async def _get_semantic_cached_response(
+        self,
+        query: str,
+        user_id: Optional[str],
+        doc_ids: Optional[List[str]],
+        chat_history: Optional[List],
+        intent: str,
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[List[float]]]:
+        if not self._semantic_cache_allowed(chat_history):
+            return None, None
+
+        self._prune_semantic_cache()
+        scope = self._semantic_cache_scope(user_id, doc_ids, intent)
+        query_embedding = await self.retrieval.pinecone_store.get_embedding(query.strip())
+
+        best_score = -1.0
+        best_response: Optional[Dict[str, Any]] = None
+
+        with AdvancedRAGService._semantic_cache_lock:
+            for key, item in AdvancedRAGService._semantic_cache.items():
+                if item.get("scope") != scope:
+                    continue
+                score = self._cosine_similarity(query_embedding, item.get("query_embedding", []))
+                if score >= settings.SEMANTIC_CACHE_SIMILARITY_THRESHOLD and score > best_score:
+                    best_score = score
+                    best_response = copy.deepcopy(item.get("response"))
+                    AdvancedRAGService._semantic_cache.move_to_end(key)
+
+        if best_response:
+            logger.info(f"Semantic response cache hit (intent={intent}, score={best_score:.3f})")
+            return best_response, query_embedding
+        if best_score >= 0:
+            logger.info(
+                "Semantic response cache miss "
+                f"(intent={intent}, best_score={best_score:.3f}, threshold={settings.SEMANTIC_CACHE_SIMILARITY_THRESHOLD:.3f})"
+            )
+        else:
+            logger.info(
+                "Semantic response cache miss "
+                f"(intent={intent}, reason=no_candidates_in_scope, threshold={settings.SEMANTIC_CACHE_SIMILARITY_THRESHOLD:.3f})"
+            )
+        return None, query_embedding
+
+    def _set_semantic_cached_response(
+        self,
+        query: str,
+        response: Dict[str, Any],
+        user_id: Optional[str],
+        doc_ids: Optional[List[str]],
+        chat_history: Optional[List],
+        intent: str,
+        query_embedding: Optional[List[float]] = None,
+    ) -> None:
+        if not self._semantic_cache_allowed(chat_history):
+            return
+        if query_embedding is None:
+            return
+
+        cache_key = hashlib.sha256(
+            json.dumps(
+                {
+                    "query": query.strip(),
+                    "scope": self._semantic_cache_scope(user_id, doc_ids, intent),
+                    "ts_bucket": int(time.time() // 60),
+                },
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+        with AdvancedRAGService._semantic_cache_lock:
+            AdvancedRAGService._semantic_cache[cache_key] = {
+                "scope": self._semantic_cache_scope(user_id, doc_ids, intent),
+                "query_embedding": query_embedding,
+                "response": copy.deepcopy(response),
+                "expires_at": time.time() + settings.QUERY_RESPONSE_CACHE_TTL_SECONDS,
+            }
+            AdvancedRAGService._semantic_cache.move_to_end(cache_key)
+        self._prune_semantic_cache()
 
     @staticmethod
     def _build_doc_names(user_id: Optional[str]) -> Dict[str, str]:
@@ -220,6 +406,13 @@ class AdvancedRAGService:
             chat_history: Previous conversation messages for follow-up context
             doc_ids: List of document IDs to filter by (empty/None = all documents)
         """
+        normalized_doc_ids = self._normalize_doc_ids(doc_ids)
+        cache_key = self._build_response_cache_key(query, user_id, normalized_doc_ids, chat_history)
+        cached_response = self._get_cached_response(cache_key)
+        if cached_response:
+            logger.info("Response cache hit (non-stream)")
+            return cached_response
+
         # Route query by intent
         intent = self.query_router.classify(query)
 
@@ -236,18 +429,50 @@ class AdvancedRAGService:
 
         if intent == "summary":
             logger.info("Routed to summary pipeline")
-            effective_doc_ids = self._resolve_summary_doc_ids(query, user_id, doc_ids)
-            return await self._generate_summary(
+            effective_doc_ids = self._resolve_summary_doc_ids(query, user_id, normalized_doc_ids)
+            semantic_cached, semantic_embedding = await self._get_semantic_cached_response(
+                query=query,
+                user_id=user_id,
+                doc_ids=effective_doc_ids,
+                chat_history=chat_history,
+                intent="summary",
+            )
+            if semantic_cached:
+                self._set_cached_response(cache_key, semantic_cached)
+                return semantic_cached
+            result = await self._generate_summary(
                 query,
                 user_id,
                 chat_history=chat_history,
                 doc_ids=effective_doc_ids
             )
+            self._set_cached_response(cache_key, result)
+            self._set_semantic_cached_response(
+                query=query,
+                response=result,
+                user_id=user_id,
+                doc_ids=effective_doc_ids,
+                chat_history=chat_history,
+                intent="summary",
+                query_embedding=semantic_embedding,
+            )
+            return result
 
         # Document query - full RAG pipeline
         logger.info(f"Routed to RAG pipeline (intent: {intent})")
+        semantic_cached, semantic_embedding = await self._get_semantic_cached_response(
+            query=query,
+            user_id=user_id,
+            doc_ids=normalized_doc_ids,
+            chat_history=chat_history,
+            intent="document_query",
+        )
+        if semantic_cached:
+            self._set_cached_response(cache_key, semantic_cached)
+            return semantic_cached
+
         logger.info(f"Retrieving candidates for: {query[:80]}")
-        candidates = await self.retrieval.retrieve(query, user_id=user_id, doc_ids=doc_ids)
+        candidates = await self.retrieval.retrieve(query, user_id=user_id, doc_ids=normalized_doc_ids)
         logger.info(f"Retrieved {len(candidates)} candidates")
 
         # Filter out empty/low-content chunks
@@ -255,7 +480,7 @@ class AdvancedRAGService:
         logger.info(f"After filtering low-content: {len(candidates)} candidates")
 
         reranked = await self.reranker.rerank(query, candidates, settings.RERANK_TOP_K)
-        reranked = self._diversify_by_doc(reranked, settings.RERANK_TOP_K, doc_ids)
+        reranked = self._diversify_by_doc(reranked, settings.RERANK_TOP_K, normalized_doc_ids)
         logger.info(f"Reranked to {len(reranked)} results")
 
         doc_names = self._build_doc_names(user_id)
@@ -283,13 +508,24 @@ class AdvancedRAGService:
         entities = self._extract_entities(query, answer)
         logger.info(f"Extracted {len(entities)} entities")
 
-        return {
+        response = {
             "answer": answer,
             "contexts": contexts,
             "sources": [doc.get("metadata", {}) for doc in reranked],
             "entities": entities,
             "reflection": reflection,
         }
+        self._set_cached_response(cache_key, response)
+        self._set_semantic_cached_response(
+            query=query,
+            response=response,
+            user_id=user_id,
+            doc_ids=normalized_doc_ids,
+            chat_history=chat_history,
+            intent="document_query",
+            query_embedding=semantic_embedding,
+        )
+        return response
 
     async def _generate_summary(self, query: str, user_id: Optional[str] = None, chat_history: Optional[List] = None, doc_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         """Generate a document summary using content from early pages."""
@@ -360,8 +596,32 @@ class AdvancedRAGService:
     async def answer_stream(self, query: str, user_id: Optional[str] = None, chat_history: Optional[List] = None, doc_ids: Optional[List[str]] = None) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
         """Stream an answer as SSE events. Yields (event_type, data) tuples."""
 
+        normalized_doc_ids = self._normalize_doc_ids(doc_ids)
+        cache_key = self._build_response_cache_key(query, user_id, normalized_doc_ids, chat_history)
+
         # 1. Route query by intent
         yield ("status", {"stage": "routing"})
+        cached_response = self._get_cached_response(cache_key)
+        if cached_response:
+            logger.info("Response cache hit (stream)")
+            yield ("cache", {"cache_hit": True, "cache_type": "exact"})
+            if cached_response.get("sources") or cached_response.get("contexts"):
+                yield ("sources", {
+                    "sources": cached_response.get("sources", []),
+                    "contexts": cached_response.get("contexts", []),
+                })
+            yield ("status", {"stage": "generating"})
+            yield ("token", {"content": cached_response.get("answer", "")})
+            reflection = cached_response.get("reflection")
+            if reflection:
+                yield ("reflection", reflection)
+            entities = cached_response.get("entities", [])
+            if entities:
+                yield ("status", {"stage": "extracting"})
+                yield ("entities", {"entities": entities})
+            yield ("done", {})
+            return
+
         intent = await asyncio.to_thread(self.query_router.classify, query)
 
         if intent in ("greeting", "chitchat"):
@@ -374,20 +634,48 @@ class AdvancedRAGService:
             return
 
         if intent == "summary":
-            effective_doc_ids = self._resolve_summary_doc_ids(query, user_id, doc_ids)
+            effective_doc_ids = self._resolve_summary_doc_ids(query, user_id, normalized_doc_ids)
             async for event in self._generate_summary_stream(query, user_id, chat_history, effective_doc_ids):
                 yield event
             return
 
         # 2. Retrieve
+        semantic_cached, semantic_embedding = await self._get_semantic_cached_response(
+            query=query,
+            user_id=user_id,
+            doc_ids=normalized_doc_ids,
+            chat_history=chat_history,
+            intent="document_query",
+        )
+        if semantic_cached:
+            self._set_cached_response(cache_key, semantic_cached)
+            yield ("cache", {"cache_hit": True, "cache_type": "semantic"})
+            if semantic_cached.get("sources") or semantic_cached.get("contexts"):
+                yield ("sources", {
+                    "sources": semantic_cached.get("sources", []),
+                    "contexts": semantic_cached.get("contexts", []),
+                })
+            yield ("status", {"stage": "generating"})
+            yield ("token", {"content": semantic_cached.get("answer", "")})
+            reflection = semantic_cached.get("reflection")
+            if reflection:
+                yield ("reflection", reflection)
+            entities = semantic_cached.get("entities", [])
+            if entities:
+                yield ("status", {"stage": "extracting"})
+                yield ("entities", {"entities": entities})
+            yield ("done", {})
+            return
+
+        yield ("cache", {"cache_hit": False, "cache_type": "none"})
         yield ("status", {"stage": "retrieving"})
-        candidates = await self.retrieval.retrieve(query, user_id=user_id, doc_ids=doc_ids)
+        candidates = await self.retrieval.retrieve(query, user_id=user_id, doc_ids=normalized_doc_ids)
         candidates = [c for c in candidates if len(c.get("text", "").strip()) > 10]
 
         # 3. Rerank
         yield ("status", {"stage": "reranking"})
         reranked = await self.reranker.rerank(query, candidates, settings.RERANK_TOP_K)
-        reranked = self._diversify_by_doc(reranked, settings.RERANK_TOP_K, doc_ids)
+        reranked = self._diversify_by_doc(reranked, settings.RERANK_TOP_K, normalized_doc_ids)
 
         # 4. Assemble contexts with document labels
         doc_names = await asyncio.to_thread(self._build_doc_names, user_id)
@@ -405,6 +693,7 @@ class AdvancedRAGService:
             yield ("token", {"content": token})
 
         # 7. Judge evaluation
+        reflection_payload = None
         if self.answer_judge:
             yield ("status", {"stage": "evaluating"})
             verdict = await asyncio.to_thread(self.answer_judge.evaluate, query, contexts, full_answer)
@@ -424,17 +713,73 @@ class AdvancedRAGService:
                 verdict = await asyncio.to_thread(self.answer_judge.evaluate, query, contexts, full_answer)
                 verdict.was_regenerated = True
 
-            yield ("reflection", verdict.to_dict())
+            reflection_payload = verdict.to_dict()
+            yield ("reflection", reflection_payload)
 
         # 8. Extract entities
         yield ("status", {"stage": "extracting"})
         entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
         yield ("entities", {"entities": entities})
 
+        self._set_cached_response(cache_key, {
+            "answer": full_answer,
+            "contexts": contexts,
+            "sources": sources,
+            "entities": entities,
+            "reflection": reflection_payload,
+        })
+        self._set_semantic_cached_response(
+            query=query,
+            response={
+                "answer": full_answer,
+                "contexts": contexts,
+                "sources": sources,
+                "entities": entities,
+                "reflection": reflection_payload,
+            },
+            user_id=user_id,
+            doc_ids=normalized_doc_ids,
+            chat_history=chat_history,
+            intent="document_query",
+            query_embedding=semantic_embedding,
+        )
+
         yield ("done", {})
 
     async def _generate_summary_stream(self, query: str, user_id: Optional[str] = None, chat_history: Optional[List] = None, doc_ids: Optional[List[str]] = None) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
         """Stream a document summary as SSE events."""
+        semantic_cached, semantic_embedding = await self._get_semantic_cached_response(
+            query=query,
+            user_id=user_id,
+            doc_ids=doc_ids,
+            chat_history=chat_history,
+            intent="summary",
+        )
+        if semantic_cached:
+            self._set_cached_response(
+                self._build_response_cache_key(query, user_id, doc_ids, chat_history),
+                semantic_cached
+            )
+            yield ("cache", {"cache_hit": True, "cache_type": "semantic"})
+            if semantic_cached.get("sources") or semantic_cached.get("contexts"):
+                yield ("sources", {
+                    "sources": semantic_cached.get("sources", []),
+                    "contexts": semantic_cached.get("contexts", []),
+                })
+            yield ("status", {"stage": "generating"})
+            yield ("token", {"content": semantic_cached.get("answer", "")})
+            reflection = semantic_cached.get("reflection")
+            if reflection:
+                yield ("reflection", reflection)
+            entities = semantic_cached.get("entities", [])
+            if entities:
+                yield ("status", {"stage": "extracting"})
+                yield ("entities", {"entities": entities})
+            yield ("done", {})
+            return
+
+        cache_key = self._build_response_cache_key(query, user_id, doc_ids, chat_history)
+        yield ("cache", {"cache_hit": False, "cache_type": "none"})
         yield ("status", {"stage": "retrieving"})
         summary_query = "introduction abstract overview purpose scope objectives table of contents"
         candidates = await self.retrieval.retrieve(summary_query, user_id=user_id, doc_ids=doc_ids)
@@ -474,6 +819,7 @@ class AdvancedRAGService:
             yield ("token", {"content": token})
 
         # Judge evaluation
+        reflection_payload = None
         if self.answer_judge:
             yield ("status", {"stage": "evaluating"})
             verdict = await asyncio.to_thread(self.answer_judge.evaluate, summary_prompt, contexts, full_answer)
@@ -492,11 +838,35 @@ class AdvancedRAGService:
                 verdict = await asyncio.to_thread(self.answer_judge.evaluate, summary_prompt, contexts, full_answer)
                 verdict.was_regenerated = True
 
-            yield ("reflection", verdict.to_dict())
+            reflection_payload = verdict.to_dict()
+            yield ("reflection", reflection_payload)
 
         yield ("status", {"stage": "extracting"})
         entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
         yield ("entities", {"entities": entities})
+
+        self._set_cached_response(cache_key, {
+            "answer": full_answer,
+            "contexts": contexts,
+            "sources": sources,
+            "entities": entities,
+            "reflection": reflection_payload,
+        })
+        self._set_semantic_cached_response(
+            query=query,
+            response={
+                "answer": full_answer,
+                "contexts": contexts,
+                "sources": sources,
+                "entities": entities,
+                "reflection": reflection_payload,
+            },
+            user_id=user_id,
+            doc_ids=doc_ids,
+            chat_history=chat_history,
+            intent="summary",
+            query_embedding=semantic_embedding,
+        )
 
         yield ("done", {})
 

@@ -51,6 +51,15 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4"
     VISION_MODEL: str = "gpt-4-vision-preview"
     TEMPERATURE: float = 0.7
+    ENABLE_EMBEDDING_CACHE: bool = True
+    EMBEDDING_CACHE_TTL_SECONDS: int = 60 * 60 * 24
+    EMBEDDING_CACHE_MAX_SIZE: int = 20000
+    ENABLE_QUERY_RESPONSE_CACHE: bool = True
+    QUERY_RESPONSE_CACHE_TTL_SECONDS: int = 60 * 15
+    QUERY_RESPONSE_CACHE_MAX_SIZE: int = 2000
+    ENABLE_SEMANTIC_QUERY_CACHE: bool = True
+    SEMANTIC_CACHE_SIMILARITY_THRESHOLD: float = 0.92
+    SEMANTIC_CACHE_REQUIRE_EMPTY_HISTORY: bool = True
 
     # Chunking Settings
     PARENT_CHUNK_SIZE: int = 1500

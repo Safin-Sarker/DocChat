@@ -4,10 +4,12 @@ from typing import List, Dict, Any, Optional
 from pinecone import Pinecone, ServerlessSpec
 from langchain_openai import OpenAIEmbeddings
 from app.core.config import settings
+from app.services.cache_utils import TTLCache
 
 
 class PineconeStore:
     """Wrapper for Pinecone vector database operations."""
+    _embedding_cache: Optional[TTLCache[str, List[float]]] = None
 
     def __init__(self):
         """Initialize Pinecone connection."""
@@ -18,6 +20,11 @@ class PineconeStore:
         self.client = Pinecone(api_key=settings.PINECONE_API_KEY)
         self.index_name = settings.PINECONE_INDEX_NAME
         self.index = None
+        if settings.ENABLE_EMBEDDING_CACHE and PineconeStore._embedding_cache is None:
+            PineconeStore._embedding_cache = TTLCache(
+                max_size=settings.EMBEDDING_CACHE_MAX_SIZE,
+                ttl_seconds=settings.EMBEDDING_CACHE_TTL_SECONDS,
+            )
         self._ensure_index_exists()
 
     def _ensure_index_exists(self):
@@ -58,7 +65,15 @@ class PineconeStore:
             Embedding vector
         """
         try:
-            return self.embeddings.embed_query(text)
+            cache = PineconeStore._embedding_cache if settings.ENABLE_EMBEDDING_CACHE else None
+            if cache:
+                cached = cache.get(text)
+                if cached is not None:
+                    return cached
+            embedding = self.embeddings.embed_query(text)
+            if cache:
+                cache.set(text, embedding)
+            return embedding
         except Exception as e:
             print(f"Error getting embedding: {e}")
             raise
@@ -75,7 +90,32 @@ class PineconeStore:
         try:
             if not texts:
                 return []
-            return self.embeddings.embed_documents(texts)
+
+            cache = PineconeStore._embedding_cache if settings.ENABLE_EMBEDDING_CACHE else None
+            if not cache:
+                return self.embeddings.embed_documents(texts)
+
+            # Preserve order and duplicates while minimizing embed calls
+            unique_missing: Dict[str, None] = {}
+            for text in texts:
+                if cache.get(text) is None:
+                    unique_missing[text] = None
+
+            if unique_missing:
+                missing_texts = list(unique_missing.keys())
+                missing_embeddings = self.embeddings.embed_documents(missing_texts)
+                for text, embedding in zip(missing_texts, missing_embeddings):
+                    cache.set(text, embedding)
+
+            results: List[List[float]] = []
+            for text in texts:
+                embedding = cache.get(text)
+                if embedding is None:
+                    embedding = self.embeddings.embed_query(text)
+                    cache.set(text, embedding)
+                results.append(embedding)
+
+            return results
         except Exception as e:
             print(f"Error getting batch embeddings: {e}")
             raise

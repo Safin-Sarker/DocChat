@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AppShell } from '@/components/layout/AppShell';
-import { ChatContainer } from '@/components/features/chat/ChatContainer';
-import { LoginForm } from '@/components/features/auth/LoginForm';
-import { LandingPage } from '@/components/pages/LandingPage';
-import { useAuthStore } from '@/stores/authStore';
+import { AppShell } from '@/presentation/layout/AppShell';
+import { ChatContainer } from '@/presentation/features/chat/ChatContainer';
+import { LoginForm } from '@/presentation/features/auth/LoginForm';
+import { LandingPage } from '@/presentation/pages/LandingPage';
+import { useAuthStore } from '@/infrastructure/stores/authStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
