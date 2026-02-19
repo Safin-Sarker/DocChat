@@ -1,5 +1,5 @@
 import { Bot } from 'lucide-react';
-import { useChatStore } from '@/infrastructure/stores/chatStore';
+import { useAppSelector } from '@/infrastructure/store/hooks';
 import type { SSEStage } from '@/domain/query/types';
 
 const STAGE_LABELS: Record<SSEStage, string> = {
@@ -13,7 +13,7 @@ const STAGE_LABELS: Record<SSEStage, string> = {
 };
 
 export function TypingIndicator() {
-  const streamingStage = useChatStore((s) => s.streamingStage);
+  const streamingStage = useAppSelector((s) => s.chat.streamingStage);
   const label = streamingStage ? STAGE_LABELS[streamingStage] || 'Processing...' : 'Thinking...';
 
   return (

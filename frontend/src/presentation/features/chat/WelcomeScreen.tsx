@@ -1,7 +1,8 @@
 import { Upload, MessageSquare, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/presentation/ui/button';
 import { Logo } from '@/presentation/shared/Logo';
-import { useUploadModal } from '@/infrastructure/stores/uploadModalStore';
+import { useAppDispatch } from '@/infrastructure/store/hooks';
+import { openUploadModal } from '@/infrastructure/store/slices/uploadModalSlice';
 
 interface WelcomeScreenProps {
   hasDocument: boolean;
@@ -9,7 +10,7 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ hasDocument, hasUploadedDocs = false }: WelcomeScreenProps) {
-  const { open: openUploadModal } = useUploadModal();
+  const dispatch = useAppDispatch();
 
   const heading = hasDocument
     ? 'Start a conversation'
@@ -38,7 +39,7 @@ export function WelcomeScreen({ hasDocument, hasUploadedDocs = false }: WelcomeS
         </div>
 
         {!hasDocument && !hasUploadedDocs && (
-          <Button onClick={openUploadModal} size="lg" className="gap-2">
+          <Button onClick={() => dispatch(openUploadModal())} size="lg" className="gap-2">
             <Upload className="h-4 w-4" />
             Upload Document
           </Button>

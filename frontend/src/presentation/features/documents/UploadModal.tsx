@@ -3,8 +3,9 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDocumentUpload } from '@/application/document/useDocumentUpload';
-import { useChatStore } from '@/infrastructure/stores/chatStore';
-import { useUploadModal } from '@/infrastructure/stores/uploadModalStore';
+import { useAppDispatch } from '@/infrastructure/store/hooks';
+import { addUploadedDocument } from '@/infrastructure/store/slices/chatSlice';
+import { setUploading } from '@/infrastructure/store/slices/uploadModalSlice';
 import {
   Dialog,
   DialogContent,
@@ -34,8 +35,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     reset,
   } = useDocumentUpload();
 
-  const addUploadedDocument = useChatStore((state) => state.addUploadedDocument);
-  const { setUploading } = useUploadModal();
+  const dispatch = useAppDispatch();
 
   // Track if we've shown the toast to prevent duplicates
   const hasShownSuccessToast = useRef(false);
@@ -43,8 +43,8 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
 
   // Update uploading state
   useEffect(() => {
-    setUploading(isPending);
-  }, [isPending, setUploading]);
+    dispatch(setUploading(isPending));
+  }, [isPending, dispatch]);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -94,17 +94,17 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
 
         uploadDocument(file, {
           onSuccess: (response) => {
-            addUploadedDocument({
+            dispatch(addUploadedDocument({
               doc_id: response.doc_id,
               filename: file.name,
               pages: response.pages,
               uploadedAt: new Date().toISOString(),
-            });
+            }));
           },
         });
       }
     },
-    [uploadDocument, addUploadedDocument]
+    [uploadDocument, dispatch]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

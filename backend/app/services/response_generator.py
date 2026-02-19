@@ -83,3 +83,4 @@ class ResponseGenerator:
         async for chunk in self.client.astream(messages):
             if chunk.content:
                 yield chunk.content
+

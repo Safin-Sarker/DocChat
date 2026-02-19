@@ -4,8 +4,8 @@ import { Button } from '@/presentation/ui/button';
 import { ScrollArea } from '@/presentation/ui/scroll-area';
 import { UserMenu } from '@/presentation/shared/UserMenu';
 import { DocumentList } from '@/presentation/features/documents/DocumentList';
-import { useChatStore } from '@/infrastructure/stores/chatStore';
-import { useAuthStore } from '@/infrastructure/stores/authStore';
+import { useAppSelector, useAppDispatch } from '@/infrastructure/store/hooks';
+import { clearMessages, clearDocSelection, setUploadedDocuments } from '@/infrastructure/store/slices/chatSlice';
 import { getDocuments } from '@/infrastructure/api/document.api';
 import { cn } from '@/lib/utils';
 
@@ -19,8 +19,9 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose, onToggleSidebar, onUploadClick }: SidebarProps) {
   const [isLoading, setIsLoading] = useState(false);
   const hasFetched = useRef(false);
-  const { isAuthenticated } = useAuthStore();
-  const { clearMessages, clearDocSelection, uploadedDocuments } = useChatStore();
+  const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
+  const uploadedDocuments = useAppSelector((s) => s.chat.uploadedDocuments);
+  const dispatch = useAppDispatch();
 
   // Fetch documents only once on mount
   useEffect(() => {
@@ -31,7 +32,7 @@ export function Sidebar({ isOpen, onClose, onToggleSidebar, onUploadClick }: Sid
       setIsLoading(true);
       try {
         const docs = await getDocuments();
-        useChatStore.getState().setUploadedDocuments(docs);
+        dispatch(setUploadedDocuments(docs));
       } catch (error) {
         console.error('Failed to fetch documents:', error);
         hasFetched.current = false; // Allow retry on error
@@ -41,11 +42,11 @@ export function Sidebar({ isOpen, onClose, onToggleSidebar, onUploadClick }: Sid
     };
 
     fetchDocuments();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, dispatch]);
 
   const handleNewChat = () => {
-    clearMessages();
-    clearDocSelection();
+    dispatch(clearMessages());
+    dispatch(clearDocSelection());
   };
 
   const docCount = uploadedDocuments.length;

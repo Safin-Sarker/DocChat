@@ -5,10 +5,12 @@ import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { MainContent } from './MainContent';
 import { UploadModal } from '@/presentation/features/documents/UploadModal';
-import { useChatStore } from '@/infrastructure/stores/chatStore';
-import { useUploadModal } from '@/infrastructure/stores/uploadModalStore';
+import { useAppSelector, useAppDispatch } from '@/infrastructure/store/hooks';
+import { openUploadModal, closeUploadModal } from '@/infrastructure/store/slices/uploadModalSlice';
+import { setServerSessionId, clearMessages } from '@/infrastructure/store/slices/chatSlice';
 import { healthCheck } from '@/infrastructure/api/health.api';
 import { useTheme } from '@/application/theme/useTheme';
+import { store } from '@/infrastructure/store';
 
 interface AppShellProps {
   children: ReactNode;
@@ -17,8 +19,10 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isConnected, setIsConnected] = useState(true);
+  const dispatch = useAppDispatch();
 
-  const { isOpen: isUploadModalOpen, isUploading, open: openUploadModal, close: closeUploadModal } = useUploadModal();
+  const isUploadModalOpen = useAppSelector((s) => s.uploadModal.isOpen);
+  const isUploading = useAppSelector((s) => s.uploadModal.isUploading);
 
   // Initialize theme
   useTheme();
@@ -28,12 +32,11 @@ export function AppShell({ children }: AppShellProps) {
 
   // Check server health - skip during uploads to avoid timeout errors
   useEffect(() => {
-    const { serverSessionId, setServerSessionId, clearMessages } = useChatStore.getState();
-    serverSessionIdRef.current = serverSessionId;
+    serverSessionIdRef.current = store.getState().chat.serverSessionId;
 
     const checkHealth = async () => {
       // Skip health check if we're uploading a document
-      if (useUploadModal.getState().isUploading) {
+      if (store.getState().uploadModal.isUploading) {
         return;
       }
 
@@ -43,16 +46,16 @@ export function AppShell({ children }: AppShellProps) {
 
         if (health.session_id) {
           if (serverSessionIdRef.current && serverSessionIdRef.current !== health.session_id) {
-            clearMessages();
+            dispatch(clearMessages());
           }
           if (serverSessionIdRef.current !== health.session_id) {
             serverSessionIdRef.current = health.session_id;
-            setServerSessionId(health.session_id);
+            dispatch(setServerSessionId(health.session_id));
           }
         }
       } catch {
         // Only show disconnected if not uploading
-        if (!useUploadModal.getState().isUploading) {
+        if (!store.getState().uploadModal.isUploading) {
           setIsConnected(false);
         }
       }
@@ -61,7 +64,7 @@ export function AppShell({ children }: AppShellProps) {
     checkHealth();
     const interval = setInterval(checkHealth, 60000); // Check every 60 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [dispatch]);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -77,7 +80,7 @@ export function AppShell({ children }: AppShellProps) {
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-            onUploadClick={openUploadModal}
+            onUploadClick={() => dispatch(openUploadModal())}
           />
 
           <MainContent>{children}</MainContent>
@@ -85,7 +88,7 @@ export function AppShell({ children }: AppShellProps) {
 
         <UploadModal
           open={isUploadModalOpen}
-          onOpenChange={(open) => open ? openUploadModal() : closeUploadModal()}
+          onOpenChange={(open) => dispatch(open ? openUploadModal() : closeUploadModal())}
         />
 
         <Toaster position="bottom-right" />

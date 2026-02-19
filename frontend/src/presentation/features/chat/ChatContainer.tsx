@@ -1,20 +1,27 @@
+import { useEffect } from 'react';
 import { useRAGQueryStream } from '@/application/query/useRAGQueryStream';
-import { useChatStore } from '@/infrastructure/stores/chatStore';
+import { useAppSelector, useAppDispatch } from '@/infrastructure/store/hooks';
+import { addMessage, setLoading, truncateMessagesAt } from '@/infrastructure/store/slices/chatSlice';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { WelcomeScreen } from './WelcomeScreen';
 
 export function ChatContainer() {
-  const {
-    messages,
-    addMessage,
-    setLoading,
-    selectedDocIds,
-    selectAllDocs,
-    isLoading,
-    uploadedDocuments,
-  } = useChatStore();
+  const messages = useAppSelector((s) => s.chat.messages);
+  const selectedDocIds = useAppSelector((s) => s.chat.selectedDocIds);
+  const selectAllDocs = useAppSelector((s) => s.chat.selectAllDocs);
+  const isLoading = useAppSelector((s) => s.chat.isLoading);
+  const uploadedDocuments = useAppSelector((s) => s.chat.uploadedDocuments);
+  const dispatch = useAppDispatch();
   const { streamQuery } = useRAGQueryStream();
+
+  // Safety: clear stuck loading state on mount (e.g. after page refresh)
+  useEffect(() => {
+    if (isLoading) {
+      dispatch(setLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const hasDocsSelected = selectedDocIds.length > 0;
 
@@ -22,18 +29,18 @@ export function ChatContainer() {
     if (!hasDocsSelected) return;
 
     // Add user message
-    addMessage({
+    dispatch(addMessage({
       role: 'user',
       content: userMessage,
-    });
+    }));
 
     // Add placeholder assistant message
-    addMessage({
+    dispatch(addMessage({
       role: 'assistant',
       content: '',
-    });
+    }));
 
-    setLoading(true);
+    dispatch(setLoading(true));
 
     // Build chat history from recent messages (max 10) for follow-up context
     const recentHistory = messages
@@ -62,9 +69,7 @@ export function ChatContainer() {
     if (userMessage.role !== 'user') return;
 
     // Remove the current assistant message and regenerate
-    useChatStore.setState((state) => ({
-      messages: state.messages.slice(0, messageIndex),
-    }));
+    dispatch(truncateMessagesAt(messageIndex));
 
     // Resubmit the user message
     handleSubmit(userMessage.content);

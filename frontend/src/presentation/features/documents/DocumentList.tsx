@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { FileText, Check } from 'lucide-react';
 import { toast } from 'sonner';
-import { useChatStore } from '@/infrastructure/stores/chatStore';
+import { useAppSelector, useAppDispatch } from '@/infrastructure/store/hooks';
+import { toggleDocSelection, setSelectAllDocs, removeUploadedDocument } from '@/infrastructure/store/slices/chatSlice';
 import { deleteDocument } from '@/infrastructure/api/document.api';
 import { DocumentItem } from './DocumentItem';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
@@ -18,25 +19,21 @@ interface DocumentListProps {
 export function DocumentList({ isLoading }: DocumentListProps) {
   const [deleteDoc, setDeleteDoc] = useState<UploadedDocument | null>(null);
   const [previewDoc, setPreviewDoc] = useState<UploadedDocument | null>(null);
-  const {
-    uploadedDocuments,
-    selectedDocIds,
-    selectAllDocs,
-    toggleDocSelection,
-    setSelectAllDocs,
-    removeUploadedDocument,
-  } = useChatStore();
+  const dispatch = useAppDispatch();
+  const uploadedDocuments = useAppSelector((s) => s.chat.uploadedDocuments);
+  const selectedDocIds = useAppSelector((s) => s.chat.selectedDocIds);
+  const selectAllDocsFlag = useAppSelector((s) => s.chat.selectAllDocs);
 
   const handleDelete = async (doc: UploadedDocument) => {
     try {
       await deleteDocument(doc.doc_id);
-      removeUploadedDocument(doc.doc_id);
+      dispatch(removeUploadedDocument(doc.doc_id));
       toast.success('Document deleted', {
         description: doc.filename,
       });
     } catch (error) {
       console.error('Failed to delete document:', error);
-      removeUploadedDocument(doc.doc_id);
+      dispatch(removeUploadedDocument(doc.doc_id));
       toast.error('Failed to delete', {
         description: 'Document removed from list',
       });
@@ -79,28 +76,28 @@ export function DocumentList({ isLoading }: DocumentListProps) {
           <div
             className={cn(
               'flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors',
-              selectAllDocs ? 'bg-primary/10 text-primary' : 'hover:bg-accent'
+              selectAllDocsFlag ? 'bg-primary/10 text-primary' : 'hover:bg-accent'
             )}
-            onClick={() => setSelectAllDocs(!selectAllDocs)}
+            onClick={() => dispatch(setSelectAllDocs(!selectAllDocsFlag))}
             role="checkbox"
-            aria-checked={selectAllDocs}
+            aria-checked={selectAllDocsFlag}
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setSelectAllDocs(!selectAllDocs);
+                dispatch(setSelectAllDocs(!selectAllDocsFlag));
               }
             }}
           >
             <div
               className={cn(
                 'flex-shrink-0 w-4 h-4 rounded border transition-colors flex items-center justify-center',
-                selectAllDocs
+                selectAllDocsFlag
                   ? 'bg-primary border-primary'
                   : 'border-muted-foreground/40'
               )}
             >
-              {selectAllDocs && <Check className="w-3 h-3 text-primary-foreground" />}
+              {selectAllDocsFlag && <Check className="w-3 h-3 text-primary-foreground" />}
             </div>
             <span className="text-sm font-medium">All Documents</span>
           </div>
@@ -111,7 +108,7 @@ export function DocumentList({ isLoading }: DocumentListProps) {
             key={doc.doc_id}
             document={doc}
             isSelected={selectedDocIds.includes(doc.doc_id)}
-            onToggle={() => toggleDocSelection(doc.doc_id)}
+            onToggle={() => dispatch(toggleDocSelection(doc.doc_id))}
             onPreview={() => setPreviewDoc(doc)}
             onDelete={async () => setDeleteDoc(doc)}
           />

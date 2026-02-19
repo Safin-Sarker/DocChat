@@ -1,39 +1,22 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
+import { useAppSelector, useAppDispatch } from '@/infrastructure/store/hooks';
+import { setTheme as setThemeAction, toggleTheme as toggleThemeAction } from '@/infrastructure/store/slices/themeSlice';
 
 type Theme = 'light' | 'dark' | 'system';
 
-interface ThemeStore {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-  toggleTheme: () => void;
-}
-
-const useThemeStore = create<ThemeStore>()(
-  persist(
-    (set, get) => ({
-      theme: 'system',
-
-      setTheme: (theme) => set({ theme }),
-
-      toggleTheme: () => {
-        const current = get().theme;
-        const isDark =
-          current === 'dark' ||
-          (current === 'system' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
-        set({ theme: isDark ? 'light' : 'dark' });
-      },
-    }),
-    {
-      name: 'theme-storage',
-    }
-  )
-);
-
 export function useTheme() {
-  const { theme, setTheme, toggleTheme } = useThemeStore();
+  const theme = useAppSelector((s) => s.theme.theme);
+  const dispatch = useAppDispatch();
+
+  const setTheme = useCallback(
+    (t: Theme) => dispatch(setThemeAction(t)),
+    [dispatch]
+  );
+
+  const toggleTheme = useCallback(
+    () => dispatch(toggleThemeAction()),
+    [dispatch]
+  );
 
   useEffect(() => {
     const root = window.document.documentElement;

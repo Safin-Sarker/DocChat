@@ -1,5 +1,6 @@
 import apiClient, { API_URL } from './apiClient';
-import { useAuthStore } from '@/infrastructure/stores/authStore';
+import { getStore } from '@/infrastructure/store/storeRef';
+import { logout } from '@/infrastructure/store/slices/authSlice';
 import type { QueryRequest, QueryResponse } from '@/domain/query/types';
 
 export const queryRAG = async (queryRequest: QueryRequest): Promise<QueryResponse> => {
@@ -10,12 +11,15 @@ export const queryRAG = async (queryRequest: QueryRequest): Promise<QueryRespons
   return response.data;
 };
 
+const STREAM_STALE_TIMEOUT_MS = 45000; // 45s max wait between chunks
+
 export const queryRAGStream = async (
   queryRequest: QueryRequest,
   onEvent: (eventType: string, data: any) => void,
   signal?: AbortSignal
 ): Promise<void> => {
-  const token = useAuthStore.getState().token;
+  const token = getStore().getState().auth.token;
+
   const response = await fetch(`${API_URL}/api/v1/query/stream`, {
     method: 'POST',
     headers: {
@@ -28,7 +32,7 @@ export const queryRAGStream = async (
 
   if (!response.ok) {
     if (response.status === 401) {
-      useAuthStore.getState().logout();
+      getStore().dispatch(logout());
     }
     const errorData = await response.json().catch(() => ({ detail: 'Stream request failed' }));
     throw new Error(errorData.detail || `HTTP ${response.status}`);
@@ -38,8 +42,23 @@ export const queryRAGStream = async (
   const decoder = new TextDecoder();
   let buffer = '';
 
+  // Helper: read with a stale-connection timeout
+  const readWithTimeout = (): Promise<ReadableStreamReadResult<Uint8Array>> => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reader.cancel().catch(() => {});
+        reject(new Error('Stream timed out waiting for data'));
+      }, STREAM_STALE_TIMEOUT_MS);
+
+      reader.read().then(
+        (result) => { clearTimeout(timer); resolve(result); },
+        (err) => { clearTimeout(timer); reject(err); }
+      );
+    });
+  };
+
   while (true) {
-    const { done, value } = await reader.read();
+    const { done, value } = await readWithTimeout();
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });

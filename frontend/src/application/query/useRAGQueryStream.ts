@@ -1,6 +1,14 @@
 import { useCallback, useRef } from 'react';
 import { queryRAGStream } from '@/infrastructure/api/query.api';
-import { useChatStore } from '@/infrastructure/stores/chatStore';
+import { store } from '@/infrastructure/store';
+import {
+  appendToLastMessage,
+  replaceLastMessageContent,
+  setStreamingStage,
+  updateLastMessageMeta,
+  setEntities,
+  setLoading,
+} from '@/infrastructure/store/slices/chatSlice';
 import type { QueryRequest } from '@/domain/query/types';
 
 export const useRAGQueryStream = () => {
@@ -15,58 +23,50 @@ export const useRAGQueryStream = () => {
       await queryRAGStream(
         queryRequest,
         (eventType, data) => {
-          const {
-            appendToLastMessage,
-            replaceLastMessageContent,
-            setStreamingStage,
-            updateLastMessageMeta,
-            setEntities,
-          } = useChatStore.getState();
-
           switch (eventType) {
             case 'status':
-              setStreamingStage(data.stage);
+              store.dispatch(setStreamingStage(data.stage));
               break;
             case 'token':
               if (data.replace) {
-                replaceLastMessageContent('');
+                store.dispatch(replaceLastMessageContent(''));
               } else {
-                appendToLastMessage(data.content);
+                store.dispatch(appendToLastMessage(data.content));
               }
               break;
             case 'sources':
-              updateLastMessageMeta(data.sources, data.contexts);
+              store.dispatch(updateLastMessageMeta({ sources: data.sources, contexts: data.contexts }));
               break;
             case 'reflection':
-              updateLastMessageMeta(undefined, undefined, data);
+              store.dispatch(updateLastMessageMeta({ reflection: data }));
               break;
             case 'cache':
-              updateLastMessageMeta(undefined, undefined, undefined, data);
+              store.dispatch(updateLastMessageMeta({ cache: data }));
               break;
             case 'entities':
-              setEntities(data.entities);
+              store.dispatch(setEntities(data.entities));
               break;
             case 'error':
-              replaceLastMessageContent(
+              store.dispatch(replaceLastMessageContent(
                 'Sorry, I encountered an error processing your query. Please try again.'
-              );
+              ));
               break;
             case 'done':
-              setStreamingStage(null);
+              store.dispatch(setStreamingStage(null));
               break;
           }
         },
         controller.signal
       );
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        useChatStore.getState().replaceLastMessageContent(
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        store.dispatch(replaceLastMessageContent(
           'Sorry, I encountered an error processing your query. Please try again.'
-        );
+        ));
       }
     } finally {
-      useChatStore.getState().setLoading(false);
-      useChatStore.getState().setStreamingStage(null);
+      store.dispatch(setLoading(false));
+      store.dispatch(setStreamingStage(null));
     }
   }, []);
 

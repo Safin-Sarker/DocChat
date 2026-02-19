@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/infrastructure/stores/authStore';
+import { useAppDispatch } from '@/infrastructure/store/hooks';
+import { setAuth } from '@/infrastructure/store/slices/authSlice';
 import { login, register } from '@/infrastructure/api/auth.api';
 import { Button } from '@/presentation/ui/button';
 import { Input } from '@/presentation/ui/input';
@@ -19,7 +20,7 @@ function GoogleIcon() {
 }
 
 export function LoginForm() {
-  const { setAuth } = useAuthStore();
+  const dispatch = useAppDispatch();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -70,14 +71,14 @@ export function LoginForm() {
       const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
       const decoded = atob(padded);
       const user = JSON.parse(decoded);
-      setAuth(token, user);
+      dispatch(setAuth({ token, user }));
       window.history.replaceState(null, '', '/login');
       navigate(nextPath);
     } catch {
       setError('OAuth login failed: invalid user payload');
       window.history.replaceState(null, '', '/login');
     }
-  }, [navigate, setAuth]);
+  }, [navigate, dispatch]);
 
   const startOAuth = (provider: 'google') => {
     clearError();
@@ -100,7 +101,7 @@ export function LoginForm() {
 
     try {
       const response = await login({ email: loginEmail, password: loginPassword });
-      setAuth(response.access_token, response.user);
+      dispatch(setAuth({ token: response.access_token, user: response.user }));
       navigate('/app');
     } catch (err: any) {
       setError(err.detail || 'Login failed. Please check your credentials.');
@@ -131,7 +132,7 @@ export function LoginForm() {
         username: registerUsername,
         password: registerPassword,
       });
-      setAuth(response.access_token, response.user);
+      dispatch(setAuth({ token: response.access_token, user: response.user }));
       navigate('/app');
     } catch (err: any) {
       setError(err.detail || 'Registration failed. Email or username may already exist.');

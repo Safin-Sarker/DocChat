@@ -4,7 +4,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp: string;
   sources?: Array<Record<string, any>>;
   contexts?: string[];
   reflection?: ReflectionScore | null;
