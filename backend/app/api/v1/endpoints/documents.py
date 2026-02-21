@@ -20,6 +20,7 @@ from app.models.document import Document
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.limiter import limiter
+from app.core.retry import retry_async, retry_sync
 
 
 router = APIRouter()
@@ -147,39 +148,84 @@ async def delete_document(
 ):
     """Delete a document and all associated data (requires authentication)."""
     user_id = current_user["user_id"]
+
+    # Step 0: Verify document exists before touching external services
+    doc = Document.get_by_id(doc_id, user_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    logger.info("Starting deletion of document %s for user %s", doc_id, user_id)
     errors = []
 
-    # 1. Delete from Pinecone
+    # Step 1: Delete from Pinecone (vectors) — with retry
     try:
         pinecone_store = PineconeStore()
-        await pinecone_store.delete_by_doc_id(doc_id, user_id=user_id)
+        await retry_async(
+            pinecone_store.delete_by_doc_id,
+            doc_id,
+            user_id=user_id,
+            max_attempts=3,
+            base_delay=1.0,
+            operation_name=f"Pinecone delete (doc={doc_id})",
+        )
+        logger.info("Pinecone delete succeeded for doc %s", doc_id)
     except Exception as e:
-        errors.append(f"Pinecone: {str(e)}")
+        logger.error("Pinecone delete failed for doc %s after retries: %s", doc_id, e)
+        errors.append(f"Pinecone: {e}")
 
-    # 2. Delete from Neo4j Graph
+    # Step 2: Delete from Neo4j Graph — with retry, connection always closed
+    graph_store = GraphStore()
     try:
-        graph_store = GraphStore()
-        graph_store.delete_by_doc_id(doc_id, user_id=user_id)
-        graph_store.close()
+        retry_sync(
+            graph_store.delete_by_doc_id,
+            doc_id,
+            user_id=user_id,
+            max_attempts=3,
+            base_delay=1.0,
+            operation_name=f"Neo4j delete (doc={doc_id})",
+        )
+        logger.info("Neo4j delete succeeded for doc %s", doc_id)
     except Exception as e:
-        errors.append(f"Graph: {str(e)}")
+        logger.error("Neo4j delete failed for doc %s after retries: %s", doc_id, e)
+        errors.append(f"Graph: {e}")
+    finally:
+        graph_store.close()
 
-    # 3. Delete from Storage
+    # Step 3: Delete from Storage (files) — with retry
     try:
         storage = StorageService()
-        await storage.delete_document_files(doc_id, user_id=user_id)
+        await retry_async(
+            storage.delete_document_files,
+            doc_id,
+            user_id=user_id,
+            max_attempts=3,
+            base_delay=1.0,
+            operation_name=f"Storage delete (doc={doc_id})",
+        )
+        logger.info("Storage delete succeeded for doc %s", doc_id)
     except Exception as e:
-        errors.append(f"Storage: {str(e)}")
+        logger.error("Storage delete failed for doc %s after retries: %s", doc_id, e)
+        errors.append(f"Storage: {e}")
 
-    # 4. Delete from Database
-    try:
-        Document.delete(doc_id, user_id)
-    except Exception as e:
-        errors.append(f"Database: {str(e)}")
+    # Step 4: Delete from Database — ONLY if all external deletes succeeded.
+    # If any external service failed, keep the DB record so the user can
+    # retry and so orphaned data remains discoverable.
+    if not errors:
+        try:
+            Document.delete(doc_id, user_id)
+            logger.info("Database delete succeeded for doc %s", doc_id)
+        except Exception as e:
+            logger.error("Database delete failed for doc %s: %s", doc_id, e)
+            errors.append(f"Database: {e}")
 
     if errors:
+        logger.warning(
+            "Partial deletion for doc %s: %d error(s): %s",
+            doc_id, len(errors), "; ".join(errors),
+        )
         return DeleteDocumentResponse(status="partial", doc_id=doc_id, errors=errors)
 
+    logger.info("Full deletion completed for doc %s", doc_id)
     return DeleteDocumentResponse(status="deleted", doc_id=doc_id)
 
 
