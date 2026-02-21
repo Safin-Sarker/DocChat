@@ -1,8 +1,11 @@
 """Excel extraction utilities."""
 
+import logging
 from typing import Any, Dict, List
 
 from openpyxl import load_workbook
+
+logger = logging.getLogger(__name__)
 
 
 def _rows_to_markdown(rows: List[List[str]]) -> str:
@@ -32,7 +35,7 @@ class ExcelExtractor:
         try:
             workbook = load_workbook(xlsx_path, data_only=True, read_only=True)
         except Exception as exc:
-            print(f"XLSX load failed: {exc}")
+            logger.error("XLSX load failed: %s", exc)
             return []
 
         sheets_out: List[Dict[str, Any]] = []
@@ -64,7 +67,7 @@ class ExcelExtractor:
         try:
             workbook = load_workbook(xlsx_path, data_only=True, read_only=True)
         except Exception as exc:
-            print(f"XLSX load failed for tables: {exc}")
+            logger.error("XLSX load failed for tables: %s", exc)
             return []
 
         tables_out: List[Dict[str, Any]] = []

@@ -1,8 +1,11 @@
 """PPTX extraction utilities."""
 
+import logging
 from typing import Any, Dict, List
 
 from pptx import Presentation
+
+logger = logging.getLogger(__name__)
 
 
 def _rows_to_markdown(rows: List[List[str]]) -> str:
@@ -32,7 +35,7 @@ class PptxExtractor:
         try:
             prs = Presentation(pptx_path)
         except Exception as exc:
-            print(f"PPTX load failed: {exc}")
+            logger.error("PPTX load failed: %s", exc)
             return []
 
         pages: List[Dict[str, Any]] = []
@@ -55,7 +58,7 @@ class PptxExtractor:
         try:
             prs = Presentation(pptx_path)
         except Exception as exc:
-            print(f"PPTX load failed for tables: {exc}")
+            logger.error("PPTX load failed for tables: %s", exc)
             return []
 
         tables_out: List[Dict[str, Any]] = []

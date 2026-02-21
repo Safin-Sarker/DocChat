@@ -1,8 +1,11 @@
 """DOCX extraction utilities."""
 
+import logging
 from typing import Any, Dict, List
 
 from docx import Document as DocxDocument
+
+logger = logging.getLogger(__name__)
 
 
 def _rows_to_markdown(rows: List[List[str]]) -> str:
@@ -32,7 +35,7 @@ class DocxExtractor:
         try:
             document = DocxDocument(docx_path)
         except Exception as exc:
-            print(f"DOCX load failed: {exc}")
+            logger.error("DOCX load failed: %s", exc)
             return []
 
         pages: List[Dict[str, Any]] = []
@@ -63,7 +66,7 @@ class DocxExtractor:
         try:
             document = DocxDocument(docx_path)
         except Exception as exc:
-            print(f"DOCX load failed for tables: {exc}")
+            logger.error("DOCX load failed for tables: %s", exc)
             return []
 
         tables_out: List[Dict[str, Any]] = []

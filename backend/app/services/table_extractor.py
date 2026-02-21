@@ -1,7 +1,10 @@
 """Table extraction utilities for PDFs."""
 
+import logging
 from typing import List, Dict, Any
 import pdfplumber
+
+logger = logging.getLogger(__name__)
 
 
 def _table_to_markdown(table: List[List[str]]) -> str:
@@ -48,6 +51,6 @@ class TableExtractor:
                             "raw": table
                         })
         except Exception as exc:
-            print(f"Table extraction failed: {exc}")
+            logger.error("Table extraction failed: %s", exc)
 
         return tables_out

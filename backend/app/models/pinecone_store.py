@@ -1,10 +1,13 @@
 """Pinecone vector store wrapper for multimodal embeddings."""
 
+import logging
 from typing import List, Dict, Any, Optional
 from pinecone import Pinecone, ServerlessSpec
 from langchain_openai import OpenAIEmbeddings
 from app.core.config import settings
 from app.services.cache_utils import TTLCache
+
+logger = logging.getLogger(__name__)
 
 
 class PineconeStore:
@@ -35,7 +38,7 @@ class PineconeStore:
             index_names = [idx.name for idx in existing_indexes]
 
             if self.index_name not in index_names:
-                print(f"Creating Pinecone index: {self.index_name}")
+                logger.info("Creating Pinecone index: %s", self.index_name)
                 self.client.create_index(
                     name=self.index_name,
                     dimension=1536,  # OpenAI ada-002 dimension
@@ -45,14 +48,14 @@ class PineconeStore:
                         region=settings.PINECONE_ENVIRONMENT
                     )
                 )
-                print(f"Index {self.index_name} created successfully")
+                logger.info("Index %s created successfully", self.index_name)
 
             # Connect to index
             self.index = self.client.Index(self.index_name)
-            print(f"Connected to Pinecone index: {self.index_name}")
+            logger.info("Connected to Pinecone index: %s", self.index_name)
 
         except Exception as e:
-            print(f"Error ensuring Pinecone index exists: {e}")
+            logger.error("Error ensuring Pinecone index exists: %s", e)
             raise
 
     async def get_embedding(self, text: str) -> List[float]:
@@ -75,7 +78,7 @@ class PineconeStore:
                 cache.set(text, embedding)
             return embedding
         except Exception as e:
-            print(f"Error getting embedding: {e}")
+            logger.error("Error getting embedding: %s", e)
             raise
 
     async def get_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
@@ -117,7 +120,7 @@ class PineconeStore:
 
             return results
         except Exception as e:
-            print(f"Error getting batch embeddings: {e}")
+            logger.error("Error getting batch embeddings: %s", e)
             raise
 
     async def upsert_vectors(self, vectors: List[Dict[str, Any]], batch_size: int = 100) -> Dict[str, int]:
@@ -146,7 +149,7 @@ class PineconeStore:
                 "index": self.index_name
             }
         except Exception as e:
-            print(f"Error upserting vectors: {e}")
+            logger.error("Error upserting vectors: %s", e)
             raise
 
     async def query(
@@ -185,7 +188,7 @@ class PineconeStore:
 
             return matches
         except Exception as e:
-            print(f"Error querying Pinecone: {e}")
+            logger.error("Error querying Pinecone: %s", e)
             raise
 
     async def query_by_text(
@@ -231,9 +234,9 @@ class PineconeStore:
                 filter_dict["user_id"] = user_id
 
             self.index.delete(filter=filter_dict)
-            print(f"Deleted vectors for document: {doc_id}" + (f" (user: {user_id})" if user_id else ""))
+            logger.info("Deleted vectors for document: %s%s", doc_id, f" (user: {user_id})" if user_id else "")
         except Exception as e:
-            print(f"Error deleting vectors: {e}")
+            logger.error("Error deleting vectors: %s", e)
             raise
 
     def get_stats(self) -> Dict[str, Any]:
@@ -250,5 +253,5 @@ class PineconeStore:
                 "index_name": self.index_name
             }
         except Exception as e:
-            print(f"Error getting stats: {e}")
+            logger.error("Error getting stats: %s", e)
             return {}

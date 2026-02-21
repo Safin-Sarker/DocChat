@@ -1,5 +1,6 @@
 """Storage service for handling file uploads (S3 or local)."""
 
+import logging
 import os
 import stat
 import shutil
@@ -7,6 +8,8 @@ from pathlib import Path
 from typing import Optional
 import uuid
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _remove_readonly(func, path, _):
@@ -26,7 +29,7 @@ class StorageService:
             # Create local storage directory if it doesn't exist
             self.storage_path = Path(settings.LOCAL_STORAGE_PATH)
             self.storage_path.mkdir(parents=True, exist_ok=True)
-            print(f"Using local storage at: {self.storage_path}")
+            logger.info("Using local storage at: %s", self.storage_path)
         else:
             # Initialize S3 client
             try:
@@ -38,9 +41,9 @@ class StorageService:
                     region_name=settings.AWS_REGION
                 )
                 self.bucket_name = settings.AWS_BUCKET_NAME
-                print(f"Using AWS S3 storage: {self.bucket_name}")
+                logger.info("Using AWS S3 storage: %s", self.bucket_name)
             except Exception as e:
-                print(f"Error initializing S3 client: {e}")
+                logger.error("Error initializing S3 client: %s", e)
                 raise
 
     async def upload_file(
@@ -94,11 +97,11 @@ class StorageService:
             dest_path = self.storage_path / storage_key
             shutil.copy2(file_path, dest_path)
 
-            print(f"File uploaded to local storage: {dest_path}")
+            logger.info("File uploaded to local storage: %s", dest_path)
             return str(dest_path)
 
         except Exception as e:
-            print(f"Error uploading to local storage: {e}")
+            logger.error("Error uploading to local storage: %s", e)
             raise
 
     async def _upload_s3(self, file_path: str, storage_key: str) -> str:
@@ -121,12 +124,12 @@ class StorageService:
 
             # Generate S3 URL
             s3_url = f"s3://{self.bucket_name}/{storage_key}"
-            print(f"File uploaded to S3: {s3_url}")
+            logger.info("File uploaded to S3: %s", s3_url)
 
             return s3_url
 
         except Exception as e:
-            print(f"Error uploading to S3: {e}")
+            logger.error("Error uploading to S3: %s", e)
             raise
 
     async def upload_image(
@@ -182,7 +185,7 @@ class StorageService:
             return str(dest_path)
 
         except Exception as e:
-            print(f"Error uploading image to local storage: {e}")
+            logger.error("Error uploading image to local storage: %s", e)
             raise
 
     async def _upload_image_s3(self, image_data: bytes, storage_key: str) -> str:
@@ -206,7 +209,7 @@ class StorageService:
             return f"s3://{self.bucket_name}/{storage_key}"
 
         except Exception as e:
-            print(f"Error uploading image to S3: {e}")
+            logger.error("Error uploading image to S3: %s", e)
             raise
 
     async def delete_document_files(self, doc_id: str, user_id: Optional[str] = None):
@@ -236,9 +239,9 @@ class StorageService:
 
             if doc_dir.exists():
                 shutil.rmtree(doc_dir, onerror=_remove_readonly)
-                print(f"Deleted local files for document: {doc_id}" + (f" (user: {user_id})" if user_id else ""))
+                logger.info("Deleted local files for document: %s%s", doc_id, f" (user: {user_id})" if user_id else "")
         except Exception as e:
-            print(f"Error deleting local files: {e}")
+            logger.error("Error deleting local files: %s", e)
             raise
 
     async def _delete_s3(self, doc_id: str, user_id: Optional[str] = None):
@@ -267,10 +270,10 @@ class StorageService:
                     Bucket=self.bucket_name,
                     Delete={'Objects': objects}
                 )
-                print(f"Deleted S3 files for document: {doc_id}" + (f" (user: {user_id})" if user_id else ""))
+                logger.info("Deleted S3 files for document: %s%s", doc_id, f" (user: {user_id})" if user_id else "")
 
         except Exception as e:
-            print(f"Error deleting S3 files: {e}")
+            logger.error("Error deleting S3 files: %s", e)
             raise
 
     def get_file_url(self, storage_key: str) -> str:

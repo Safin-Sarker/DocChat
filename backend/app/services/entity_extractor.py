@@ -1,10 +1,13 @@
 """Entity extraction using LLM."""
 
+import logging
 from typing import List
 import json
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class EntityExtractor:
@@ -38,5 +41,5 @@ class EntityExtractor:
             entities = data.get("entities", [])
             return [e.strip() for e in entities if isinstance(e, str) and e.strip()]
         except Exception as exc:
-            print(f"Entity extraction failed: {exc}")
+            logger.error("Entity extraction failed: %s", exc)
             return []

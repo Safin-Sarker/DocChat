@@ -1,10 +1,13 @@
 """Query expansion using LLM."""
 
+import logging
 from typing import List
 import json
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class QueryExpander:
@@ -39,5 +42,5 @@ class QueryExpander:
             cleaned = [q.strip() for q in queries if isinstance(q, str) and q.strip()]
             return [query] + [q for q in cleaned if q != query]
         except Exception as exc:
-            print(f"Query expansion failed: {exc}")
+            logger.error("Query expansion failed: %s", exc)
             return [query]

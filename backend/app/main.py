@@ -17,8 +17,17 @@ if sys.platform == 'win32':
         except ImportError:
             pass
 
+import logging
 import time
 from contextlib import asynccontextmanager
+
+# Configure logging for the entire application
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -39,7 +48,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     init_db()
-    print("Database initialized")
+    logger.info("Database initialized")
     yield
     # Shutdown
     pass

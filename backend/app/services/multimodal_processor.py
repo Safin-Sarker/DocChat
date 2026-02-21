@@ -302,7 +302,7 @@ class MultimodalProcessor:
             with Image.open(file_path) as image:
                 return self.ocr_service.extract_text_from_image(image.convert("RGB"))
         except Exception as exc:
-            print(f"Image OCR failed: {exc}")
+            logger.error("Image OCR failed: %s", exc)
             return ""
 
     async def _upload_original_image(
@@ -334,7 +334,7 @@ class MultimodalProcessor:
                 "height": height,
             }]
         except Exception as exc:
-            print(f"Image upload failed: {exc}")
+            logger.error("Image upload failed: %s", exc)
             return []
 
     def _detect_file_type(self, filename: str) -> str:
@@ -368,7 +368,7 @@ class MultimodalProcessor:
                         "text": text
                     })
         except Exception as exc:
-            print(f"Text extraction failed: {exc}")
+            logger.error("Text extraction failed: %s", exc)
 
         return pages
 
@@ -379,7 +379,7 @@ class MultimodalProcessor:
             pil_image = page_image.original
             return self.ocr_service.extract_text_from_image(pil_image)
         except Exception as exc:
-            print(f"OCR page render failed: {exc}")
+            logger.error("OCR page render failed: %s", exc)
             return ""
 
     async def _index_text_chunks(self, child_data: List[Dict[str, Any]], user_id: Optional[str] = None) -> int:

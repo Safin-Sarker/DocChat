@@ -1,8 +1,11 @@
 """Neo4j graph store wrapper."""
 
+import logging
 from typing import List, Dict, Any, Optional
 from neo4j import GraphDatabase
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class GraphStore:
@@ -209,5 +212,5 @@ class GraphStore:
                         for record in result
                     ]
         except Exception as e:
-            print(f"Graph query error: {e}")
+            logger.error("Graph query error: %s", e)
             return []

@@ -1,9 +1,12 @@
 """Reranker wrapper using OpenAI embeddings."""
 
+import logging
 from typing import List, Dict, Any, Optional
 from math import sqrt, ceil
 from openai import OpenAI
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class Reranker:
@@ -15,7 +18,7 @@ class Reranker:
             try:
                 self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
             except Exception as exc:
-                print(f"OpenAI client init failed: {exc}")
+                logger.error("OpenAI client init failed: %s", exc)
 
     @staticmethod
     def _cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
@@ -41,7 +44,7 @@ class Reranker:
         try:
             return await self._rerank_with_openai(query, docs, top_k)
         except Exception as exc:
-            print(f"OpenAI reranking failed: {exc}")
+            logger.error("OpenAI reranking failed: %s", exc)
             return self._balanced_select(docs, top_k)
 
     # Minimum cosine similarity for a chunk to be considered relevant.

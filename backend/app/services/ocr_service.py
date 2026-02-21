@@ -1,9 +1,12 @@
 """OCR service for scanned documents."""
 
+import logging
 import os
 import sys
 from PIL import Image
 import pytesseract
+
+logger = logging.getLogger(__name__)
 
 # Configure Tesseract path for Windows
 if sys.platform == 'win32':
@@ -27,5 +30,5 @@ class OCRService:
         try:
             return pytesseract.image_to_string(image) or ""
         except Exception as exc:
-            print(f"OCR extraction failed: {exc}")
+            logger.error("OCR extraction failed: %s", exc)
             return ""

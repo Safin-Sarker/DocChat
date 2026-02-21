@@ -1,8 +1,11 @@
 """Build Neo4j graph from document content."""
 
+import logging
 from typing import List, Optional
 from app.models.graph_store import GraphStore
 from app.services.entity_extractor import EntityExtractor
+
+logger = logging.getLogger(__name__)
 
 
 class GraphBuilder:
@@ -20,7 +23,7 @@ class GraphBuilder:
             self.graph_store.ensure_constraints()
             self.available = True
         except Exception as exc:
-            print(f"Neo4j unavailable, graph building disabled: {exc}")
+            logger.warning("Neo4j unavailable, graph building disabled: %s", exc)
 
     def build_from_texts(self, texts: List[str], doc_id: str, user_id: Optional[str] = None):
         """Extract entities and build co-occurrence relationships.

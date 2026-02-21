@@ -1,5 +1,6 @@
 """Image extraction service for PDFs."""
 
+import logging
 from typing import List, Dict, Any, Optional
 from pdf2image import convert_from_path
 from PIL import Image
@@ -7,6 +8,8 @@ import io
 import uuid
 import pdfplumber
 from app.services.storage_service import StorageService
+
+logger = logging.getLogger(__name__)
 
 
 class ImageExtractor:
@@ -34,7 +37,7 @@ class ImageExtractor:
                 convert_from_path(pdf_path, first_page=1, last_page=1, dpi=72)
             except Exception as check_exc:
                 if "poppler" in str(check_exc).lower():
-                    print("Poppler not installed, skipping image extraction. Install poppler and add to PATH.")
+                    logger.warning("Poppler not installed, skipping image extraction. Install poppler and add to PATH.")
                     return images_out
                 raise
 
@@ -74,8 +77,8 @@ class ImageExtractor:
                     # Free memory immediately
                     del image, page_images, buffer
                 except Exception as page_exc:
-                    print(f"Image extraction failed for page {page_num}: {page_exc}")
+                    logger.error("Image extraction failed for page %d: %s", page_num, page_exc)
         except Exception as exc:
-            print(f"Image extraction failed: {exc}")
+            logger.error("Image extraction failed: %s", exc)
 
         return images_out
