@@ -4,9 +4,12 @@ import json
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
+from starlette.requests import Request
 from app.schemas.query import QueryRequest, QueryResponse
 from app.services.advanced_rag import AdvancedRAGService
 from app.core.auth import get_current_user
+from app.core.config import settings
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +17,9 @@ router = APIRouter()
 
 
 @router.post("/", response_model=QueryResponse)
+@limiter.limit(settings.RATE_LIMIT_QUERY)
 async def query_documents(
+    request: Request,
     payload: QueryRequest,
     current_user: dict = Depends(get_current_user)
 ):
@@ -38,7 +43,9 @@ async def query_documents(
 
 
 @router.post("/stream")
+@limiter.limit(settings.RATE_LIMIT_QUERY_STREAM)
 async def query_documents_stream(
+    request: Request,
     payload: QueryRequest,
     current_user: dict = Depends(get_current_user)
 ):

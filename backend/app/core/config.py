@@ -11,32 +11,32 @@ class Settings(BaseSettings):
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
 
-    # Authentication
-    SECRET_KEY: str = "change-this-secret-key-in-production-use-strong-random-string"
+    # Authentication (required — set in .env)
+    SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
-    # OAuth
+    # OAuth (optional)
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     OAUTH_FRONTEND_URL: str = "http://localhost:5173"
     OAUTH_BACKEND_URL: str = "http://localhost:8001"
 
-    # Pinecone
+    # Pinecone (required — set in .env)
     PINECONE_API_KEY: str
     PINECONE_ENVIRONMENT: str = "gcp-starter"
     PINECONE_INDEX_NAME: str = "docgraph-multimodal"
 
-    # Neo4j (Aura Cloud)
-    NEO4J_URI: str = "neo4j+ssc://cd1238c4.databases.neo4j.io"
+    # Neo4j (required — set in .env)
+    NEO4J_URI: str
     NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "G_5gA7-z_Vj_0WyQlgtuc1k5Hhrk8w753VfnzQ5FaSM"
+    NEO4J_PASSWORD: str
 
-    # OpenAI
+    # OpenAI (required — set in .env)
     OPENAI_API_KEY: str
 
-    # AWS S3 (Optional - can use local storage)
-    AWS_ACCESS_KEY_ID: str = "not_required"
-    AWS_SECRET_ACCESS_KEY: str = "not_required"
+    # AWS S3 (optional — defaults to local storage)
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
     AWS_BUCKET_NAME: str = "local_storage"
     AWS_REGION: str = "us-east-1"
     USE_LOCAL_STORAGE: bool = True
@@ -45,6 +45,21 @@ class Settings(BaseSettings):
     # API Settings
     CORS_ORIGINS: list = ["*"]
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
+
+    # Rate Limiting (values use limits library syntax, e.g. "5/minute", "100/hour")
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_LOGIN: str = "5/minute"
+    RATE_LIMIT_REGISTER: str = "3/minute"
+    RATE_LIMIT_OAUTH: str = "10/minute"
+    RATE_LIMIT_AUTH_ME: str = "30/minute"
+    RATE_LIMIT_AUTH_LOGOUT: str = "10/minute"
+    RATE_LIMIT_DOCUMENTS_LIST: str = "30/minute"
+    RATE_LIMIT_DOCUMENT_UPLOAD: str = "5/minute"
+    RATE_LIMIT_DOCUMENT_DELETE: str = "10/minute"
+    RATE_LIMIT_DOCUMENT_FILE: str = "30/minute"
+    RATE_LIMIT_QUERY: str = "5/minute"
+    RATE_LIMIT_QUERY_STREAM: str = "5/minute"
+    RATE_LIMIT_GRAPH_RELATED: str = "20/minute"
 
     # RAG Settings
     EMBEDDING_MODEL: str = "text-embedding-ada-002"

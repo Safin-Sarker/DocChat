@@ -1,16 +1,21 @@
 """Graph endpoints."""
 
 from fastapi import APIRouter, HTTPException, Depends
+from starlette.requests import Request
 from app.schemas.graph import GraphQueryRequest, GraphQueryResponse
 from app.models.graph_store import GraphStore
 from app.core.auth import get_current_user
+from app.core.config import settings
+from app.core.limiter import limiter
 
 
 router = APIRouter()
 
 
 @router.post("/related", response_model=GraphQueryResponse)
+@limiter.limit(settings.RATE_LIMIT_GRAPH_RELATED)
 async def related_entities(
+    request: Request,
     payload: GraphQueryRequest,
     current_user: dict = Depends(get_current_user)
 ):

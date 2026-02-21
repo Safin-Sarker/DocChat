@@ -6,6 +6,7 @@ import base64
 import httpx
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from fastapi.responses import RedirectResponse
+from starlette.requests import Request
 from app.schemas.auth import (
     LoginRequest,
     RegisterRequest,
@@ -17,22 +18,24 @@ from app.models.user import User
 from app.core.security import create_access_token
 from app.core.auth import get_current_user
 from app.core.config import settings
+from app.core.limiter import limiter, _get_ip_address
 
 router = APIRouter()
 
 
 @router.post("/register", response_model=AuthResponse)
-async def register(request: RegisterRequest):
+@limiter.limit(settings.RATE_LIMIT_REGISTER, key_func=_get_ip_address)
+async def register(request: Request, reg_request: RegisterRequest):
     """Register a new user."""
     # Check if email already exists
-    if User.exists(email=request.email):
+    if User.exists(email=reg_request.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
 
     # Check if username already exists
-    if User.exists(username=request.username):
+    if User.exists(username=reg_request.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken"
@@ -40,9 +43,9 @@ async def register(request: RegisterRequest):
 
     try:
         user = User.create(
-            email=request.email,
-            username=request.username,
-            password=request.password
+            email=reg_request.email,
+            username=reg_request.username,
+            password=reg_request.password
         )
         token = create_access_token(user["user_id"])
 
@@ -58,9 +61,10 @@ async def register(request: RegisterRequest):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(request: LoginRequest):
+@limiter.limit(settings.RATE_LIMIT_LOGIN, key_func=_get_ip_address)
+async def login(request: Request, login_request: LoginRequest):
     """Login with email and password."""
-    user = User.authenticate(request.email, request.password)
+    user = User.authenticate(login_request.email, login_request.password)
 
     if not user:
         raise HTTPException(
@@ -78,7 +82,8 @@ async def login(request: LoginRequest):
 
 
 @router.get("/me", response_model=UserInfo)
-async def get_me(current_user: dict = Depends(get_current_user)):
+@limiter.limit(settings.RATE_LIMIT_AUTH_ME)
+async def get_me(request: Request, current_user: dict = Depends(get_current_user)):
     """Get current user information."""
     return UserInfo(
         user_id=current_user["user_id"],
@@ -88,7 +93,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/logout", response_model=MessageResponse)
-async def logout(current_user: dict = Depends(get_current_user)):
+@limiter.limit(settings.RATE_LIMIT_AUTH_LOGOUT)
+async def logout(request: Request, current_user: dict = Depends(get_current_user)):
     """
     Logout endpoint.
     Note: JWT tokens are stateless, so logout is handled client-side
@@ -113,7 +119,9 @@ def _build_frontend_redirect(token: str, user: dict) -> str:
 
 
 @router.get("/oauth/{provider}/start")
+@limiter.limit(settings.RATE_LIMIT_OAUTH, key_func=_get_ip_address)
 async def oauth_start(
+    request: Request,
     provider: str,
     next_path: str = Query("/app"),
 ):
@@ -141,7 +149,9 @@ async def oauth_start(
 
 
 @router.get("/oauth/{provider}/callback")
+@limiter.limit(settings.RATE_LIMIT_OAUTH, key_func=_get_ip_address)
 async def oauth_callback(
+    request: Request,
     provider: str,
     code: str = Query(...),
     state: str = Query("/app"),

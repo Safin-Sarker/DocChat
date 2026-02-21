@@ -4,6 +4,7 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import FileResponse, RedirectResponse
+from starlette.requests import Request
 from pathlib import Path
 import uuid
 import aiofiles
@@ -18,6 +19,7 @@ from app.models.graph_store import GraphStore
 from app.models.document import Document
 from app.core.auth import get_current_user
 from app.core.config import settings
+from app.core.limiter import limiter
 
 
 router = APIRouter()
@@ -57,7 +59,8 @@ def _detect_file_type(file: UploadFile) -> Optional[str]:
 
 
 @router.get("/", response_model=List[DocumentInfo])
-async def list_documents(current_user: dict = Depends(get_current_user)):
+@limiter.limit(settings.RATE_LIMIT_DOCUMENTS_LIST)
+async def list_documents(request: Request, current_user: dict = Depends(get_current_user)):
     """List all documents for the current user."""
     user_id = current_user["user_id"]
     documents = Document.get_by_user(user_id)
@@ -65,7 +68,9 @@ async def list_documents(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/upload", response_model=DocumentUploadResponse)
+@limiter.limit(settings.RATE_LIMIT_DOCUMENT_UPLOAD)
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
@@ -134,7 +139,9 @@ async def upload_document(
 
 
 @router.delete("/{doc_id}", response_model=DeleteDocumentResponse)
+@limiter.limit(settings.RATE_LIMIT_DOCUMENT_DELETE)
 async def delete_document(
+    request: Request,
     doc_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -177,7 +184,9 @@ async def delete_document(
 
 
 @router.get("/{doc_id}/file")
+@limiter.limit(settings.RATE_LIMIT_DOCUMENT_FILE)
 async def get_document_file(
+    request: Request,
     doc_id: str,
     current_user: dict = Depends(get_current_user)
 ):
