@@ -490,10 +490,13 @@ class AdvancedRAGService:
         answer = self.generator.generate(query, contexts, chat_history=chat_history)
         logger.info(f"Generated answer ({len(answer)} chars)")
 
-        # Judge evaluation
+        # Judge evaluation + entity extraction (parallel when judge enabled)
         reflection = None
         if self.answer_judge:
-            verdict = self.answer_judge.evaluate(query, contexts, answer)
+            verdict, entities = await asyncio.gather(
+                asyncio.to_thread(self.answer_judge.evaluate, query, contexts, answer),
+                asyncio.to_thread(self._extract_entities, query, answer),
+            )
             if verdict.verdict == "fail" and settings.JUDGE_MAX_RETRIES > 0:
                 logger.info(f"Judge failed answer (overall={verdict.overall:.2f}), regenerating with feedback...")
                 answer = self.generator.generate_with_feedback(
@@ -502,10 +505,11 @@ class AdvancedRAGService:
                 logger.info(f"Regenerated answer ({len(answer)} chars)")
                 verdict = self.answer_judge.evaluate(query, contexts, answer)
                 verdict.was_regenerated = True
+                # Re-extract entities from the new answer
+                entities = self._extract_entities(query, answer)
             reflection = verdict.to_dict()
-
-        # Extract entities from the answer for graph visualization
-        entities = self._extract_entities(query, answer)
+        else:
+            entities = await asyncio.to_thread(self._extract_entities, query, answer)
         logger.info(f"Extracted {len(entities)} entities")
 
         response = {
@@ -570,10 +574,13 @@ class AdvancedRAGService:
         answer = self.generator.generate(summary_prompt, contexts, chat_history=chat_history)
         logger.info(f"Generated summary ({len(answer)} chars)")
 
-        # Judge evaluation
+        # Judge evaluation + entity extraction (parallel when judge enabled)
         reflection = None
         if self.answer_judge:
-            verdict = self.answer_judge.evaluate(summary_prompt, contexts, answer)
+            verdict, entities = await asyncio.gather(
+                asyncio.to_thread(self.answer_judge.evaluate, summary_prompt, contexts, answer),
+                asyncio.to_thread(self._extract_entities, query, answer),
+            )
             if verdict.verdict == "fail" and settings.JUDGE_MAX_RETRIES > 0:
                 logger.info(f"Judge failed summary (overall={verdict.overall:.2f}), regenerating with feedback...")
                 answer = self.generator.generate_with_feedback(
@@ -582,9 +589,10 @@ class AdvancedRAGService:
                 logger.info(f"Regenerated summary ({len(answer)} chars)")
                 verdict = self.answer_judge.evaluate(summary_prompt, contexts, answer)
                 verdict.was_regenerated = True
+                entities = self._extract_entities(query, answer)
             reflection = verdict.to_dict()
-
-        entities = self._extract_entities(query, answer)
+        else:
+            entities = await asyncio.to_thread(self._extract_entities, query, answer)
 
         return {
             "answer": answer,
@@ -696,11 +704,14 @@ class AdvancedRAGService:
             full_answer += token
             yield ("token", {"content": token})
 
-        # 7. Judge evaluation
+        # 7. Judge evaluation + entity extraction (parallel)
         reflection_payload = None
         if self.answer_judge:
             yield ("status", {"stage": "evaluating"})
-            verdict = await asyncio.to_thread(self.answer_judge.evaluate, query, contexts, full_answer)
+            verdict, entities = await asyncio.gather(
+                asyncio.to_thread(self.answer_judge.evaluate, query, contexts, full_answer),
+                asyncio.to_thread(self._extract_entities, query, full_answer),
+            )
 
             if verdict.verdict == "fail" and settings.JUDGE_MAX_RETRIES > 0:
                 logger.info(f"Judge failed answer (overall={verdict.overall:.2f}), regenerating...")
@@ -716,13 +727,13 @@ class AdvancedRAGService:
 
                 verdict = await asyncio.to_thread(self.answer_judge.evaluate, query, contexts, full_answer)
                 verdict.was_regenerated = True
+                # Re-extract entities from the new answer
+                entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
 
             reflection_payload = verdict.to_dict()
             yield ("reflection", reflection_payload)
-
-        # 8. Extract entities
-        yield ("status", {"stage": "extracting"})
-        entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
+        else:
+            entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
         yield ("entities", {"entities": entities})
 
         self._set_cached_response(cache_key, {
@@ -825,11 +836,14 @@ class AdvancedRAGService:
             full_answer += token
             yield ("token", {"content": token})
 
-        # Judge evaluation
+        # Judge evaluation + entity extraction (parallel)
         reflection_payload = None
         if self.answer_judge:
             yield ("status", {"stage": "evaluating"})
-            verdict = await asyncio.to_thread(self.answer_judge.evaluate, summary_prompt, contexts, full_answer)
+            verdict, entities = await asyncio.gather(
+                asyncio.to_thread(self.answer_judge.evaluate, summary_prompt, contexts, full_answer),
+                asyncio.to_thread(self._extract_entities, query, full_answer),
+            )
 
             if verdict.verdict == "fail" and settings.JUDGE_MAX_RETRIES > 0:
                 yield ("status", {"stage": "improving"})
@@ -844,12 +858,12 @@ class AdvancedRAGService:
 
                 verdict = await asyncio.to_thread(self.answer_judge.evaluate, summary_prompt, contexts, full_answer)
                 verdict.was_regenerated = True
+                entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
 
             reflection_payload = verdict.to_dict()
             yield ("reflection", reflection_payload)
-
-        yield ("status", {"stage": "extracting"})
-        entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
+        else:
+            entities = await asyncio.to_thread(self._extract_entities, query, full_answer)
         yield ("entities", {"entities": entities})
 
         self._set_cached_response(cache_key, {
