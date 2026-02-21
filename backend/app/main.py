@@ -90,12 +90,51 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint with dependency connectivity verification."""
+    dependencies = {}
+
+    # Check Pinecone
+    try:
+        from app.models.pinecone_store import PineconeStore
+        store = PineconeStore()
+        stats = store.get_stats()
+        dependencies["pinecone"] = {
+            "status": "ok",
+            "total_vectors": stats.get("total_vectors", 0),
+        }
+    except Exception as e:
+        dependencies["pinecone"] = {"status": "error", "detail": str(e)}
+
+    # Check Neo4j
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(
+            settings.NEO4J_URI,
+            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+        )
+        driver.verify_connectivity()
+        driver.close()
+        dependencies["neo4j"] = {"status": "ok"}
+    except Exception as e:
+        dependencies["neo4j"] = {"status": "error", "detail": str(e)}
+
+    # Check OpenAI
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        client.models.list(limit=1)
+        dependencies["openai"] = {"status": "ok"}
+    except Exception as e:
+        dependencies["openai"] = {"status": "error", "detail": str(e)}
+
+    all_ok = all(dep["status"] == "ok" for dep in dependencies.values())
+
     return {
-        "status": "ok",
+        "status": "ok" if all_ok else "degraded",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "session_id": SERVER_SESSION_ID
+        "session_id": SERVER_SESSION_ID,
+        "dependencies": dependencies,
     }
 
 
