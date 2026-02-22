@@ -41,7 +41,7 @@ class PineconeStore:
                 logger.info("Creating Pinecone index: %s", self.index_name)
                 self.client.create_index(
                     name=self.index_name,
-                    dimension=1536,  # OpenAI ada-002 dimension
+                    dimension=settings.EMBEDDING_DIMENSION,
                     metric="cosine",
                     spec=ServerlessSpec(
                         cloud="aws",

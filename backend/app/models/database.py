@@ -48,5 +48,24 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT NOT NULL,
+            user_id TEXT,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT,
+            details TEXT,
+            ip_address TEXT,
+            logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Safe migration: add is_admin column to existing users table
+    cursor = conn.execute("PRAGMA table_info(users)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if "is_admin" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0")
+
     conn.commit()
     conn.close()

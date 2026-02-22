@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Upload, PanelLeftClose } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Plus, Upload, PanelLeftClose, Activity } from 'lucide-react';
 import { Button } from '@/presentation/ui/button';
 import { ScrollArea } from '@/presentation/ui/scroll-area';
 import { UserMenu } from '@/presentation/shared/UserMenu';
@@ -19,6 +20,8 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose, onToggleSidebar, onUploadClick }: SidebarProps) {
   const [isLoading, setIsLoading] = useState(false);
   const hasFetched = useRef(false);
+  const navigate = useNavigate();
+  const location = useLocation();
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const uploadedDocuments = useAppSelector((s) => s.chat.uploadedDocuments);
   const dispatch = useAppDispatch();
@@ -124,6 +127,21 @@ export function Sidebar({ isOpen, onClose, onToggleSidebar, onUploadClick }: Sid
               <DocumentList isLoading={isLoading} />
             </div>
           </ScrollArea>
+        </div>
+
+        {/* Activity Log link */}
+        <div className="mx-2 mb-1">
+          <Button
+            variant={location.pathname === '/app/activity' ? 'secondary' : 'ghost'}
+            className="w-full justify-start gap-2 h-9 text-sm rounded-lg"
+            onClick={() => {
+              navigate('/app/activity');
+              if (window.innerWidth < 1024) onClose();
+            }}
+          >
+            <Activity className="h-4 w-4" />
+            Activity Log
+          </Button>
         </div>
 
         <div className="mx-3 border-t border-border/30" />

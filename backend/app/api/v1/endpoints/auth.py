@@ -19,6 +19,7 @@ from app.core.security import create_access_token
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.limiter import limiter, _get_ip_address
+from app.models.audit_log import AuditLog
 
 router = APIRouter()
 
@@ -49,6 +50,15 @@ async def register(request: Request, reg_request: RegisterRequest):
         )
         token = create_access_token(user["user_id"])
 
+        AuditLog.log(
+            action="USER_REGISTERED",
+            resource_type="user",
+            user_id=user["user_id"],
+            resource_id=user["user_id"],
+            details={"email": reg_request.email, "username": reg_request.username},
+            ip_address=request.client.host if request.client else None,
+        )
+
         return AuthResponse(
             access_token=token,
             user=UserInfo(**user)
@@ -67,6 +77,12 @@ async def login(request: Request, login_request: LoginRequest):
     user = User.authenticate(login_request.email, login_request.password)
 
     if not user:
+        AuditLog.log(
+            action="LOGIN_FAILED",
+            resource_type="auth",
+            details={"email": login_request.email},
+            ip_address=request.client.host if request.client else None,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -74,6 +90,14 @@ async def login(request: Request, login_request: LoginRequest):
         )
 
     token = create_access_token(user["user_id"])
+
+    AuditLog.log(
+        action="LOGIN_SUCCESS",
+        resource_type="auth",
+        user_id=user["user_id"],
+        details={"email": login_request.email},
+        ip_address=request.client.host if request.client else None,
+    )
 
     return AuthResponse(
         access_token=token,
@@ -100,6 +124,12 @@ async def logout(request: Request, current_user: dict = Depends(get_current_user
     Note: JWT tokens are stateless, so logout is handled client-side
     by removing the token. This endpoint is for API completeness.
     """
+    AuditLog.log(
+        action="LOGOUT",
+        resource_type="auth",
+        user_id=current_user["user_id"],
+        ip_address=request.client.host if request.client else None,
+    )
     return MessageResponse(message="Successfully logged out")
 
 

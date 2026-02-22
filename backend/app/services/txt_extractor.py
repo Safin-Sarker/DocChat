@@ -1,8 +1,9 @@
 """Plain text file extraction utilities."""
 
 from typing import Any, Dict, List
+from app.core.config import settings
 
-MAX_SECTION_CHARS = 3000
+MAX_SECTION_CHARS = settings.TEXT_MAX_SECTION_CHARS
 
 
 class TxtExtractor:

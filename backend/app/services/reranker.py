@@ -49,7 +49,7 @@ class Reranker:
 
     # Minimum cosine similarity for a chunk to be considered relevant.
     # Chunks below this threshold are dropped before balanced selection.
-    RELEVANCE_THRESHOLD = 0.75
+    RELEVANCE_THRESHOLD = settings.RERANKER_RELEVANCE_THRESHOLD
 
     async def _rerank_with_openai(
         self, query: str, docs: List[Dict[str, Any]], top_k: int
@@ -97,7 +97,7 @@ class Reranker:
         # Drop documents whose best chunk scores much lower than the
         # top document — they are likely irrelevant to the query.
         top_doc_score = max(best_per_doc.values())
-        DOC_GAP_THRESHOLD = 0.05
+        DOC_GAP_THRESHOLD = settings.RERANKER_DOC_GAP_THRESHOLD
         relevant_doc_ids = {
             did for did, score in best_per_doc.items()
             if top_doc_score - score <= DOC_GAP_THRESHOLD

@@ -37,6 +37,22 @@ async def get_current_user(
     return user
 
 
+async def get_current_admin(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """
+    Dependency to get the current admin user.
+
+    Raises HTTPException 403 if user is not an admin.
+    """
+    if not current_user.get("is_admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
+
+
 async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False))
 ) -> dict | None:

@@ -41,7 +41,7 @@ class HybridRetrieval:
 
         # Multi-document: query each document separately for balanced results
         if doc_ids and len(doc_ids) > 1:
-            per_doc_k = max(3, math.ceil(settings.SEMANTIC_TOP_K / len(doc_ids)))
+            per_doc_k = max(settings.HYBRID_MIN_PER_DOC, math.ceil(settings.SEMANTIC_TOP_K / len(doc_ids)))
             for q in expanded_queries:
                 for doc_id in doc_ids:
                     matches = await self.pinecone_store.query_by_text(

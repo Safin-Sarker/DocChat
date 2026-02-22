@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_QUERY_STREAM: str = "5/minute"
     RATE_LIMIT_GRAPH_RELATED: str = "20/minute"
 
+    # Embedding
+    EMBEDDING_DIMENSION: int = 1536
+
     # RAG Settings
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     LLM_MODEL: str = "gpt-4"
@@ -87,6 +90,22 @@ class Settings(BaseSettings):
     GRAPH_MAX_DEPTH: int = 2
     BM25_TOP_K: int = 5
     RERANK_TOP_K: int = 10
+    HYBRID_MIN_PER_DOC: int = 3
+    CONTEXT_SNIPPET_LENGTH: int = 200
+
+    # Reranking
+    RERANKER_RELEVANCE_THRESHOLD: float = 0.75
+    RERANKER_DOC_GAP_THRESHOLD: float = 0.05
+
+    # Query Router
+    QUERY_ROUTER_MODEL: str = "gpt-4o-mini"
+    QUERY_ROUTER_TEMPERATURE: float = 0.0
+
+    # Graph Builder
+    GRAPH_BUILDER_MAX_BATCH_CHARS: int = 3000
+
+    # Text Extraction
+    TEXT_MAX_SECTION_CHARS: int = 3000
 
     # Judge (LLM-as-a-Judge reflection layer)
     JUDGE_ENABLED: bool = True
@@ -94,6 +113,7 @@ class Settings(BaseSettings):
     JUDGE_TEMPERATURE: float = 0.0
     JUDGE_THRESHOLD: float = 0.6
     JUDGE_MAX_RETRIES: int = 1
+    JUDGE_SCORE_WEIGHTS: str = "0.30,0.25,0.20,0.15,0.10"
 
     class Config:
         env_file = [".env", str(Path(__file__).resolve().parents[3] / ".env")]

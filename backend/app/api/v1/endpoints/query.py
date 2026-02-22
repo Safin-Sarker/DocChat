@@ -10,6 +10,7 @@ from app.services.advanced_rag import AdvancedRAGService
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.limiter import limiter
+from app.models.audit_log import AuditLog
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,13 @@ async def query_documents(
         service = AdvancedRAGService()
         result = await service.answer(payload.query, user_id=user_id, chat_history=payload.chat_history, doc_ids=payload.doc_ids or None)
         logger.info(f"Query answered: {len(result.get('contexts', []))} contexts, {len(result.get('entities', []))} entities")
+        AuditLog.log(
+            action="QUERY_EXECUTED",
+            resource_type="query",
+            user_id=user_id,
+            details={"query": payload.query[:200], "doc_ids": payload.doc_ids},
+            ip_address=request.client.host if request.client else None,
+        )
         return QueryResponse(**result)
     except Exception as exc:
         logger.error(f"Query failed: {exc}")
@@ -55,6 +63,13 @@ async def query_documents_stream(
 
     user_id = current_user["user_id"]
     logger.info(f"Stream query from user {user_id}: {payload.query[:100]}")
+    AuditLog.log(
+        action="QUERY_STREAM_EXECUTED",
+        resource_type="query",
+        user_id=user_id,
+        details={"query": payload.query[:200], "doc_ids": payload.doc_ids},
+        ip_address=request.client.host if request.client else None,
+    )
 
     async def event_generator():
         try:

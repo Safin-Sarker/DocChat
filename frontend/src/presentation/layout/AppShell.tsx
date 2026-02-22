@@ -52,7 +52,7 @@ export function AppShell({ children }: AppShellProps) {
 
       try {
         const health = await healthCheck();
-        setIsConnected(health.status === 'ok');
+        setIsConnected(health.status === 'ok' || health.status === 'degraded');
 
         if (health.session_id) {
           if (serverSessionIdRef.current && serverSessionIdRef.current !== health.session_id) {

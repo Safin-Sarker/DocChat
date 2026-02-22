@@ -1,17 +1,18 @@
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { store, persistor } from '@/infrastructure/store';
 import { useAppSelector } from '@/infrastructure/store/hooks';
 import { AppShell } from '@/presentation/layout/AppShell';
 import { ChatContainer } from '@/presentation/features/chat/ChatContainer';
+import { ActivityLog } from '@/presentation/features/activity/ActivityLog';
 import { LoginForm } from '@/presentation/features/auth/LoginForm';
 import { LandingPage } from '@/presentation/pages/LandingPage';
 
-function AppContent() {
+function AppLayout() {
   return (
     <AppShell>
-      <ChatContainer />
+      <Outlet />
     </AppShell>
   );
 }
@@ -54,10 +55,13 @@ function App() {
               path="/app"
               element={
                 <ProtectedRoute>
-                  <AppContent />
+                  <AppLayout />
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route index element={<ChatContainer />} />
+              <Route path="activity" element={<ActivityLog />} />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

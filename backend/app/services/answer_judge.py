@@ -75,13 +75,15 @@ class AnswerJudge:
         self.threshold = settings.JUDGE_THRESHOLD
 
     def _compute_overall(self, scores: dict) -> float:
-        """Weighted overall score: 30% faithfulness, 25% relevance, 20% completeness, 15% coherence, 10% conciseness."""
-        return (
-            0.30 * scores.get("faithfulness", 1.0)
-            + 0.25 * scores.get("relevance", 1.0)
-            + 0.20 * scores.get("completeness", 1.0)
-            + 0.15 * scores.get("coherence", 1.0)
-            + 0.10 * scores.get("conciseness", 1.0)
+        """Weighted overall score from JUDGE_SCORE_WEIGHTS config.
+
+        Default weights: 30% faithfulness, 25% relevance, 20% completeness, 15% coherence, 10% conciseness.
+        """
+        weights = [float(w) for w in settings.JUDGE_SCORE_WEIGHTS.split(",")]
+        dimensions = ["faithfulness", "relevance", "completeness", "coherence", "conciseness"]
+        return sum(
+            w * scores.get(dim, 1.0)
+            for w, dim in zip(weights, dimensions)
         )
 
     def evaluate(self, query: str, contexts: List[str], answer: str) -> JudgeVerdict:

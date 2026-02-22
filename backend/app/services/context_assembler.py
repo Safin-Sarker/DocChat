@@ -93,9 +93,9 @@ class ContextAssembler:
             else:
                 contexts.append(f"[{index}]\n{processed['combined']}")
 
-            # Build a short snippet for the source map (first 200 chars)
-            snippet = processed["combined"][:200]
-            if len(processed["combined"]) > 200:
+            # Build a short snippet for the source map
+            snippet = processed["combined"][:settings.CONTEXT_SNIPPET_LENGTH]
+            if len(processed["combined"]) > settings.CONTEXT_SNIPPET_LENGTH:
                 snippet += "..."
 
             source_map.append({

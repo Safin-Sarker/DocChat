@@ -38,8 +38,8 @@ class QueryRouter:
 
     def __init__(self):
         self.client = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
+            model=settings.QUERY_ROUTER_MODEL,
+            temperature=settings.QUERY_ROUTER_TEMPERATURE,
             openai_api_key=settings.OPENAI_API_KEY
         )
 

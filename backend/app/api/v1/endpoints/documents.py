@@ -21,6 +21,7 @@ from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.retry import retry_async, retry_sync
+from app.models.audit_log import AuditLog
 
 
 router = APIRouter()
@@ -125,6 +126,14 @@ async def upload_document(
         )
 
         logger.info(f"Upload finished: {file.filename}")
+        AuditLog.log(
+            action="DOCUMENT_UPLOADED",
+            resource_type="document",
+            user_id=user_id,
+            resource_id=result["doc_id"],
+            details={"filename": file.filename, "pages": result.get("pages", 0)},
+            ip_address=request.client.host if request.client else None,
+        )
         return DocumentUploadResponse(**result)
     except Exception as exc:
         import traceback
@@ -218,15 +227,26 @@ async def delete_document(
             logger.error("Database delete failed for doc %s: %s", doc_id, e)
             errors.append(f"Database: {e}")
 
+    delete_status = "partial" if errors else "deleted"
+
     if errors:
         logger.warning(
             "Partial deletion for doc %s: %d error(s): %s",
             doc_id, len(errors), "; ".join(errors),
         )
-        return DeleteDocumentResponse(status="partial", doc_id=doc_id, errors=errors)
+    else:
+        logger.info("Full deletion completed for doc %s", doc_id)
 
-    logger.info("Full deletion completed for doc %s", doc_id)
-    return DeleteDocumentResponse(status="deleted", doc_id=doc_id)
+    AuditLog.log(
+        action="DOCUMENT_DELETED",
+        resource_type="document",
+        user_id=user_id,
+        resource_id=doc_id,
+        details={"doc_id": doc_id, "status": delete_status},
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return DeleteDocumentResponse(status=delete_status, doc_id=doc_id, errors=errors if errors else None)
 
 
 @router.get("/{doc_id}/file")

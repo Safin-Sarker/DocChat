@@ -2,6 +2,7 @@
 
 import logging
 from typing import List, Optional
+from app.core.config import settings
 from app.models.graph_store import GraphStore
 from app.services.entity_extractor import EntityExtractor
 
@@ -34,7 +35,7 @@ class GraphBuilder:
         if not self.available:
             return
 
-        MAX_BATCH_CHARS = 3000
+        MAX_BATCH_CHARS = settings.GRAPH_BUILDER_MAX_BATCH_CHARS
         batches = []
         current_batch = ""
 
