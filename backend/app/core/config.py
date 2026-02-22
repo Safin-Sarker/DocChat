@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list = ["*"]
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
 
+    # Owner (exempt from usage limits)
+    OWNER_EMAIL: str = ""
+
+    # Usage limits (normal users only)
+    MAX_DOCUMENTS_PER_USER: int = 3
+    MAX_PAGES_PER_DOCUMENT: int = 20
+    MAX_QUERIES_PER_DAY: int = 15
+
     # Rate Limiting (values use limits library syntax, e.g. "5/minute", "100/hour")
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_LOGIN: str = "5/minute"

@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 from app.schemas.query import QueryRequest, QueryResponse
 from app.services.advanced_rag import AdvancedRAGService
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, is_owner
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.models.audit_log import AuditLog
@@ -29,6 +29,18 @@ async def query_documents(
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
     user_id = current_user["user_id"]
+
+    # --- Daily query limit (owner exempt) ---
+    if not is_owner(current_user):
+        today_count = AuditLog.count_today(
+            user_id, ["QUERY_EXECUTED", "QUERY_STREAM_EXECUTED"]
+        )
+        if today_count >= settings.MAX_QUERIES_PER_DAY:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily query limit reached ({settings.MAX_QUERIES_PER_DAY}).",
+            )
+
     logger.info(f"Query received from user {user_id}: {payload.query[:100]}")
 
     try:
@@ -62,6 +74,18 @@ async def query_documents_stream(
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
     user_id = current_user["user_id"]
+
+    # --- Daily query limit (owner exempt) ---
+    if not is_owner(current_user):
+        today_count = AuditLog.count_today(
+            user_id, ["QUERY_EXECUTED", "QUERY_STREAM_EXECUTED"]
+        )
+        if today_count >= settings.MAX_QUERIES_PER_DAY:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily query limit reached ({settings.MAX_QUERIES_PER_DAY}).",
+            )
+
     logger.info(f"Stream query from user {user_id}: {payload.query[:100]}")
     AuditLog.log(
         action="QUERY_STREAM_EXECUTED",

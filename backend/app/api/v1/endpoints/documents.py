@@ -17,11 +17,12 @@ from app.services.storage_service import StorageService
 from app.models.pinecone_store import PineconeStore
 from app.models.graph_store import GraphStore
 from app.models.document import Document
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, is_owner
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.retry import retry_async, retry_sync
 from app.models.audit_log import AuditLog
+from app.services.page_counter import count_pages
 
 
 router = APIRouter()
@@ -91,6 +92,16 @@ async def upload_document(
         )
 
     user_id = current_user["user_id"]
+
+    # --- Usage limits (owner exempt) ---
+    if not is_owner(current_user):
+        docs = Document.get_by_user(user_id)
+        if len(docs) >= settings.MAX_DOCUMENTS_PER_USER:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Document limit reached ({settings.MAX_DOCUMENTS_PER_USER}).",
+            )
+
     temp_dir = Path("./tmp_uploads")
     temp_dir.mkdir(parents=True, exist_ok=True)
     temp_path = temp_dir / f"{uuid.uuid4()}_{file.filename}"
@@ -104,6 +115,15 @@ async def upload_document(
                 if not chunk:
                     break
                 await out_file.write(chunk)
+
+        # --- Page limit check (owner exempt) ---
+        if not is_owner(current_user):
+            pages = count_pages(str(temp_path), file_type)
+            if pages > settings.MAX_PAGES_PER_DOCUMENT:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Document exceeds {settings.MAX_PAGES_PER_DOCUMENT}-page limit.",
+                )
 
         logger.info(f"File saved to disk, starting processing: {file.filename}")
 
@@ -135,6 +155,8 @@ async def upload_document(
             ip_address=request.client.host if request.client else None,
         )
         return DocumentUploadResponse(**result)
+    except HTTPException:
+        raise
     except Exception as exc:
         import traceback
         logger.error(f"Upload failed: {file.filename} - {exc}")

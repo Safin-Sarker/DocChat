@@ -3,6 +3,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .security import verify_token
+from .config import settings
 from app.models.user import User
 
 security = HTTPBearer()
@@ -35,6 +36,12 @@ async def get_current_user(
         )
 
     return user
+
+
+def is_owner(user: dict) -> bool:
+    """Check if the user is the application owner (exempt from usage limits)."""
+    owner_email = settings.OWNER_EMAIL.strip().lower()
+    return bool(owner_email and user.get("email", "").lower() == owner_email)
 
 
 async def get_current_admin(

@@ -48,6 +48,22 @@ class AuditLog:
             logger.error("Failed to write audit log: %s", exc)
 
     @staticmethod
+    def count_today(user_id: str, actions: list[str]) -> int:
+        """Count today's audit entries for a user filtered by action types."""
+        conn = get_db()
+        try:
+            placeholders = ",".join("?" for _ in actions)
+            row = conn.execute(
+                f"SELECT COUNT(*) as cnt FROM audit_logs "
+                f"WHERE user_id = ? AND action IN ({placeholders}) "
+                f"AND date(logged_at) = date('now')",
+                (user_id, *actions),
+            ).fetchone()
+            return row["cnt"] if row else 0
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_by_user(user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         """Retrieve audit logs for a specific user, newest first."""
         conn = get_db()
