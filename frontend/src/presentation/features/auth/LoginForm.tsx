@@ -57,10 +57,11 @@ export function LoginForm() {
     }
 
     const token = params.get('token');
+    const refreshTokenParam = params.get('refresh_token');
     const encodedUser = params.get('user');
     const nextPath = params.get('next') || '/app';
 
-    if (!token || !encodedUser) {
+    if (!token || !encodedUser || !refreshTokenParam) {
       setError('OAuth login failed: missing token or user data');
       window.history.replaceState(null, '', '/login');
       return;
@@ -71,7 +72,7 @@ export function LoginForm() {
       const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
       const decoded = atob(padded);
       const user = JSON.parse(decoded);
-      dispatch(setAuth({ token, user }));
+      dispatch(setAuth({ token, refreshToken: refreshTokenParam, user }));
       window.history.replaceState(null, '', '/login');
       navigate(nextPath);
     } catch {
@@ -101,7 +102,7 @@ export function LoginForm() {
 
     try {
       const response = await login({ email: loginEmail, password: loginPassword });
-      dispatch(setAuth({ token: response.access_token, user: response.user }));
+      dispatch(setAuth({ token: response.access_token, refreshToken: response.refresh_token, user: response.user }));
       navigate('/app');
     } catch (err: any) {
       setError(err.detail || 'Login failed. Please check your credentials.');
@@ -132,7 +133,7 @@ export function LoginForm() {
         username: registerUsername,
         password: registerPassword,
       });
-      dispatch(setAuth({ token: response.access_token, user: response.user }));
+      dispatch(setAuth({ token: response.access_token, refreshToken: response.refresh_token, user: response.user }));
       navigate('/app');
     } catch (err: any) {
       setError(err.detail || 'Registration failed. Email or username may already exist.');

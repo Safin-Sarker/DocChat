@@ -26,8 +26,14 @@ class UserInfo(BaseModel):
 class AuthResponse(BaseModel):
     """Authentication response with token and user info."""
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserInfo
+
+
+class RefreshRequest(BaseModel):
+    """Token refresh request schema."""
+    refresh_token: str
 
 
 class MessageResponse(BaseModel):

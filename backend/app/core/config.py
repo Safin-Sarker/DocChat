@@ -13,7 +13,8 @@ class Settings(BaseSettings):
 
     # Authentication (required — set in .env)
     SECRET_KEY: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # OAuth (optional)
     GOOGLE_CLIENT_ID: str = ""
@@ -61,6 +62,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_OAUTH: str = "10/minute"
     RATE_LIMIT_AUTH_ME: str = "30/minute"
     RATE_LIMIT_AUTH_LOGOUT: str = "10/minute"
+    RATE_LIMIT_REFRESH: str = "30/minute"
     RATE_LIMIT_DOCUMENTS_LIST: str = "30/minute"
     RATE_LIMIT_DOCUMENT_UPLOAD: str = "5/minute"
     RATE_LIMIT_DOCUMENT_DELETE: str = "10/minute"

@@ -17,6 +17,7 @@ if sys.platform == 'win32':
         except ImportError:
             pass
 
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -38,6 +39,7 @@ from app.core.config import settings
 from app.core.limiter import limiter
 from app.api.v1.api import api_router
 from app.models.database import init_db
+from app.models.refresh_token import RefreshToken
 
 # Generate unique session ID when server starts
 SERVER_SESSION_ID = str(time.time())
@@ -48,10 +50,28 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     init_db()
+    cleaned = RefreshToken.cleanup_expired(days_old=30)
+    if cleaned:
+        logger.info("Cleaned up %d expired refresh tokens", cleaned)
     logger.info("Database initialized")
+
+    # Launch periodic cleanup task
+    async def _periodic_token_cleanup():
+        while True:
+            await asyncio.sleep(86400)  # 24 hours
+            try:
+                count = RefreshToken.cleanup_expired(days_old=30)
+                if count:
+                    logger.info("Periodic cleanup: removed %d expired refresh tokens", count)
+            except Exception:
+                logger.exception("Periodic refresh token cleanup failed")
+
+    cleanup_task = asyncio.create_task(_periodic_token_cleanup())
+
     yield
+
     # Shutdown
-    pass
+    cleanup_task.cancel()
 
 # Create FastAPI application
 app = FastAPI(

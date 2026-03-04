@@ -60,6 +60,28 @@ def init_db():
             logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_hash TEXT UNIQUE NOT NULL,
+            user_id TEXT NOT NULL,
+            family_id TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            revoked_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            replaced_by_hash TEXT,
+            ip_address TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id
+        ON refresh_tokens(user_id)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_family_id
+        ON refresh_tokens(family_id)
+    """)
 
     # Safe migration: add is_admin column to existing users table
     cursor = conn.execute("PRAGMA table_info(users)")
